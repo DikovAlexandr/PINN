@@ -11,11 +11,11 @@
    - In the [notebook](StationaryTest.ipynb), a comparison was made of the analytical solution, the solution using the finite difference method and the solution using the PINN according to the L2 norm.
    - Now we need to understand why the solution using PINN is so different from the analytical one.
    - Possible solutions
-     * Changing the optimizer
-     * Network architecture
-     * Batch learning, samples
-     * Analysis of setting boundary and initial conditions
-     * Weights for loss components
+     * Changing the optimizer - Adam produces worse results than LBFGS
+     * Network architecture - 
+     * Batch learning, samples - Works strangely with LBFGS
+     * Analysis of setting boundary and initial conditions - There was a problem with specifying points for the equation, they were given as “for every x there is only one t” but there must be a grid
+     * Weights for loss components - It was found that the boundary conditions require an increase in influence (perhaps the equation points will not be satisfied on them and they need to be excluded from the points to check the equation - this has been done)
 ### Research and Documentation:
    - 
 
