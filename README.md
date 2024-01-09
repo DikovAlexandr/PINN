@@ -20,7 +20,7 @@
    - 
 
 ### Paper Review:
-   - 
+   - A brief summary of the articles can be found in the [folder](research/). There are written down the main ideas that were borrowed for my code.
 
 ## References
 
