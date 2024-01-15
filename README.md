@@ -16,8 +16,16 @@
      * Batch learning, samples - Works strangely with LBFGS
      * Analysis of setting boundary and initial conditions - There was a problem with specifying points for the equation, they were given as “for every x there is only one t” but there must be a grid
      * Weights for loss components - It was found that the boundary conditions require an increase in influence (perhaps the equation points will not be satisfied on them and they need to be excluded from the points to check the equation - this has been done)
+<<<<<<< HEAD
 ### Research and Paper Review:
    - Paper reviews will be added to the [research](research/) folder
+=======
+### Research and Documentation:
+   - 
+
+### Paper Review:
+   - A brief summary of the articles can be found in the [folder](research/). There are written down the main ideas that were borrowed for my code.
+>>>>>>> 0b74818dd9894b5aecd3ffc824d529db50a9ca77
 
 ## References
 - [**SIREN**](https://github.com/vsitzmann/siren/tree/master)
