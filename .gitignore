@@ -2,3 +2,5 @@
 /pinn_venv
 /train_img
 /env
+/logs
+/weights
