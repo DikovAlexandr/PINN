@@ -108,6 +108,15 @@ class PINN():
         elif net_params.optimizer == 'Adam':
             self.optimizer = torch.optim.Adam(self.net.parameters(), lr=1e-3)
 
+        # From: https://github.com/omniscientoctopus/Physics-Informed-Neural-Networks/blob/main/PyTorch/Burgers'%20Equation/Burgers.ipynb
+        # optimizer = torch.optim.LBFGS(PINN.parameters(), lr=0.1, 
+        #                       max_iter = 250, 
+        #                       max_eval = None, 
+        #                       tolerance_grad = 1e-05, 
+        #                       tolerance_change = 1e-09, 
+        #                       history_size = 100, 
+        #                       line_search_fn = 'strong_wolfe')
+
         # Number of epochs (for Adam optimizer)
         self.num_epochs = 3000
 
