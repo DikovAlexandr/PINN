@@ -2,6 +2,8 @@ import os
 import json
 import shutil
 import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 
 
 class NetParams:
@@ -135,3 +137,69 @@ def split_number(number):
     part4 = half - part3
 
     return part1, part2, part3, part4
+
+
+def to_numpy(tensor):
+        return tensor.cpu().detach().numpy()
+
+
+def comparison_plot(x, u_analytical, u_pinn, 
+                    output_folder, title='Comparison'):
+    """
+    Plots the comparison of analytical and PINN solutions.
+
+    Parameters:
+        x (torch.Tensor): X data for the plot
+        u_analytical (torch.Tensor): Analytical solution data
+        u_pinn (torch.Tensor): PINN solution data
+        output_folder (str): Path to the output folder
+        title (str, optional): Title of the plot. Defaults to 'Comparison'.
+
+    Returns:
+        None
+    """
+    plt.figure(figsize=(10, 10))
+    if len(x.shape) == 1:
+        plt.plot(to_numpy(x), to_numpy(u_analytical), label="Analytical")
+        plt.plot(to_numpy(x), to_numpy(u_pinn), label="PINN")
+        plt.xlabel('x')
+    else:
+        # TODO: make more comparable plot
+        plt.scatter(to_numpy(x[:, 0]), to_numpy(x[:, 1]), c=u_analytical, 
+                    marker='o', label="Analytical", cmap='viridis')
+        plt.scatter(to_numpy(x[:, 0]), to_numpy(x[:, 1]), c=u_pinn, 
+                    marker='x', label="PINN", cmap='viridis')
+        plt.colorbar(label='u')
+    plt.ylabel('u')
+    plt.legend()
+    plt.title(title)
+    if output_folder:
+        plt.savefig(os.path.join(output_folder, title + '.png'))
+        plt.show()
+    else:
+        plt.show()
+
+def loss_history_plot(data_path, output_folder, is_log=False, title='LossHistory'):
+    """
+    Generate a plot of loss history from the data.
+
+    Parameters:
+        data_path (str): The path to the CSV file containing the loss history data.
+        output_folder (str): The folder where the plot will be saved.
+        is_log (bool, optional): If True, plot the data using a logarithmic scale.
+        title (str, optional): The title of the plot.
+
+    Returns:
+        None
+    """
+    loss_history = pd.read_csv(data_path, header=None)
+    if is_log:
+        plt.semilogy(loss_history[0], loss_history[1])
+        plt.ylabel('Logarithmic Loss')
+    else:
+        plt.plot(loss_history[0], loss_history[1])
+        plt.ylabel('Loss')
+    plt.xlabel('Epoch')
+    plt.title(title)
+    plt.savefig(os.path.join(output_folder, title + '.png'))
+    plt.show()

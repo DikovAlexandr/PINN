@@ -1,97 +1,59 @@
 import os
 import torch
 import numpy as np
-import torch.nn as nn
-import torch.nn.functional as F
-import matplotlib.pyplot as plt
 
-from solver.siren import SineLayer
-from solver.conditions import set_test
-from solver.utils import create_or_clear_folder
+import solver.callbacks as callbacks
+import solver.conditions as conditions
+import solver.metrics as metrics
+import solver.enhancements as enhancements
+import solver.siren as siren
+import solver.utils as utils
 
-class MeshParams:
-    def __init__(self, size, time, alpha, initial_points, 
-                 boundary_points, equation_points):
-        self.size = size
-        self.time = time
-        self.initial_points = initial_points
-        self.boundary_points = boundary_points
-        self.equation_points = equation_points
-        self.alpha = alpha
 
-class NetParams:
-    def __init__(self, input, output, hidden_layers, activation, training_mode, optimizer, siren_params):
-        self.input = input
-        self.output = output
-        self.hidden_layers = hidden_layers
-        self.activation = activation
-        self.training_mode = training_mode
-        self.optimizer = optimizer
+def pde(dudt, d2udx2, alpha):
+    """
+    Calculate residual of differential heat equation.
 
-        if siren_params == None:
-            self.siren_params = None
-        else:
-            self.siren_params = siren_params
-        
+    Parameters:
+    dudt (torch.Tensor): the first derivative with respect to time
+    d2udx2 (torch.Tensor): the second derivative with respect to space
+    alpha (torch.Tensor): a constant parameter (thermal diffusivity coefficient)
 
-class EarlyStopping:
-    def __init__(self, patience=10000, min_delta=0.0001):
-        self.patience = patience
-        self.min_delta = min_delta
-        self.counter = 0
-        self.best_loss = None
-        self.early_stop = False
+    Returns:
+    torch.Tensor: the result of the PDE calculation
+    """
+    return dudt - alpha**2 * d2udx2
 
-    def __call__(self, current_loss):
-        if self.best_loss is None:
-            self.best_loss = current_loss
-        elif current_loss > self.best_loss - self.min_delta:
-            self.counter += 1
-            if self.counter >= self.patience:
-                self.early_stop = True
-        else:
-            self.best_loss = current_loss
-            self.counter = 0
 
 class PINN():
-    def __init__(self, mesh_params, net_params, initial_conditions, boundary_conditions, equation, device='cuda:0'):
+    def __init__(self, problem, net_params, device='cuda:0'):
         # Initial points
-        self.x_initial = initial_conditions.x[:, None].to(torch.float32).requires_grad_(True)
-        self.t_initial = initial_conditions.t[:, None].to(torch.float32).requires_grad_(True)
-        self.u_initial = initial_conditions.u[:, None].to(torch.float32).requires_grad_(True)
+        self.x_initial, self.t_initial, self.u_initial = problem.initial_conditions.get_initial_conditions()
         
         # Boundary points
-        self.x_boundary = boundary_conditions.x[:, None].to(torch.float32).requires_grad_(True)
-        self.t_boundary = boundary_conditions.t[:, None].to(torch.float32).requires_grad_(True)
-        self.u_boundary = boundary_conditions.u[:, None].to(torch.float32).requires_grad_(True)
+        self.x_boundary, self.t_boundary, self.u_boundary = problem.boundary_conditions.get_boundary_conditions()
         
         # Equation points
-        self.x_equation = equation.x[:, None].to(torch.float32).requires_grad_(True)
-        self.t_equation = equation.t[:, None].to(torch.float32).requires_grad_(True)
+        self.x_equation, self.t_equation = problem.equation.get_equation()
 
-        # Parameters of computational field and equation
-        self.alpha = mesh_params.alpha # Coefficient of temperature conductivity
-        self.size = mesh_params.size # Size of computational field
-        self.initial_points = mesh_params.initial_points # Number of points in initial conditions
-        self.boundary_points = mesh_params.boundary_points # Number of points in boundary conditions
-        self.equation_points = mesh_params.equation_points # Number of points in equation
-        self.time = mesh_params.time # Time
+        # Coefficient of thermal diffusivity
+        self.alpha = problem.alpha 
 
         # Device
         self.device = device
 
         # Siren parameters
         if net_params.siren_params != None:
-            print("Siren parameters: ", net_params.siren_params)
+            print("Siren parameters:", net_params.siren_params)
             self.first_omega_0 = net_params.siren_params.first_omega_0
             self.hidden_omega_0 = net_params.siren_params.hidden_omega_0
             self.outermost_linear = net_params.siren_params.outermost_linear
 
         # Initialize network:
-        self.activation = net_params.activation
-        self.hidden_layers = net_params.hidden_layers
         self.input = net_params.input
         self.output = net_params.output
+        self.hidden_layers = net_params.hidden_layers
+        self.activation = net_params.activation
         self.network()
         self.print_network()
 
@@ -107,92 +69,100 @@ class PINN():
                                                 line_search_fn="strong_wolfe")
         elif net_params.optimizer == 'Adam':
             self.optimizer = torch.optim.Adam(self.net.parameters(), lr=1e-3)
+        elif net_params.optimizer == 'Adam+LBFGS':
+            # TODO: Implement Adam+LBFGS optimizer
+            pass
 
         # From: https://github.com/omniscientoctopus/Physics-Informed-Neural-Networks/blob/main/PyTorch/Burgers'%20Equation/Burgers.ipynb
         # optimizer = torch.optim.LBFGS(PINN.parameters(), lr=0.1, 
-        #                       max_iter = 250, 
-        #                       max_eval = None, 
-        #                       tolerance_grad = 1e-05, 
-        #                       tolerance_change = 1e-09, 
-        #                       history_size = 100, 
-        #                       line_search_fn = 'strong_wolfe')
+        #                               max_iter = 250, max_eval = None, 
+        #                               tolerance_grad = 1e-05, tolerance_change = 1e-09, 
+        #                               history_size = 100, line_search_fn = 'strong_wolfe')
 
-        # Number of epochs (for Adam optimizer)
-        self.num_epochs = 3000
+        # Number of epochs
+        self.epochs = net_params.epochs 
+        
+        # Iteration number
+        self.iter = 0
 
         # Training mode (train on sample or full data)
         self.training_mode = net_params.training_mode
 
         # Number of samples for training
-        self.num_samples = 100
+        self.batch_size = net_params.batch_size
         
         # Null vector is needed in equation loss
         self.null = torch.zeros((len(self.x_equation), 1), device=self.device)
 
         # Loss function
-        self.mse = nn.MSELoss()
+        self.mse = torch.nn.MSELoss()
 
         # Loss
         self.loss = 0
 
-        # Iteration number
-        self.iter = 0
+        # Loss weights
+        self.weight_eq = 1
+        self.weight_bc = 1
+        self.weight_ic = 1
+
+        # Weights adjustment
+        self.adjust_weights = enhancements.LossWeightAdjuster(1e6, 1e-6, 1e-8, 10)
 
         # Save plots
-        self.output_folder = f'logs/HL_{len(self.hidden_layers)}_A_{self.activation}_N_{self.hidden_layers[-1]}'
-        create_or_clear_folder(self.output_folder)
+        self.output_path = net_params.output_path
+        utils.create_or_clear_folder(self.output_path)
 
-    def sample_training_data(self, x, t, u=None, num_samples=None):
+    def sample_training_data(self, x, t, u=None):
         # Get the total number of examples
         total_examples = x.shape[0]
 
         # Generate random indices for sampling
-        random_indices = torch.randperm(total_examples)[:num_samples].to(self.device)
+        random_indices = torch.randperm(total_examples)[:self.batch_size].to(self.device)
 
         # Sample the data
         sampled_x = x[random_indices, :]
         sampled_t = t[random_indices, :]
 
-        if u is not None:
+        if u is None:
+            return sampled_x, sampled_t
+        else:
             sampled_u = u[random_indices, :]
             return sampled_x, sampled_t, sampled_u
-        else:
-            return sampled_x, sampled_t
         
     def network(self):
         if self.activation == "sin":
             # First linear layer
-            layers = [SineLayer(self.input, self.hidden_layers[0], is_first=True, omega_0=self.first_omega_0)]
+            layers = [siren.SineLayer(self.input, self.hidden_layers[0], 
+                                      is_first=True, omega_0=self.first_omega_0)]
 
             # Hidden layers
             for i in range(1, len(self.hidden_layers)):
-                layers.append(SineLayer(self.hidden_layers[i-1], self.hidden_layers[i], 
-                                        is_first=False, omega_0=self.hidden_omega_0))
+                layers.append(siren.SineLayer(self.hidden_layers[i-1], self.hidden_layers[i], 
+                                              is_first=False, omega_0=self.hidden_omega_0))
 
             # Last linear layer
             if self.outermost_linear:
-                final_linear = nn.Linear(self.hidden_layers[-1], self.output)
+                final_linear = torch.nn.Linear(self.hidden_layers[-1], self.output)
                 with torch.no_grad():
                     final_linear.weight.uniform_(-np.sqrt(6 / self.hidden_layers[-1]) / self.hidden_omega_0, 
-                                                np.sqrt(6 / self.hidden_layers[-1]) / self.hidden_omega_0)
+                                                 np.sqrt(6 / self.hidden_layers[-1]) / self.hidden_omega_0)
                 layers.append(final_linear)
             else:
-                layers.append(SineLayer(self.hidden_layers[-1], self.output, 
-                                        is_first=False, omega_0=self.hidden_omega_0))
+                layers.append(siren.SineLayer(self.hidden_layers[-1], self.output, 
+                                              is_first=False, omega_0=self.hidden_omega_0))
             
-            self.net = nn.Sequential(*layers)
+            self.net = torch.nn.Sequential(*layers)
             self.net.to(self.device)
-
         else:
-            layers = [nn.Linear(self.input, self.hidden_layers[0]), self.activation]
+            layers = [torch.nn.Linear(self.input, self.hidden_layers[0]), self.activation]
 
             for i in range(1, len(self.hidden_layers)):
-                layers.append(nn.Linear(self.hidden_layers[i-1], self.hidden_layers[i]))
+                layers.append(torch.nn.Linear(self.hidden_layers[i-1], self.hidden_layers[i]))
                 layers.append(self.activation)
             
-            layers.append(nn.Linear(self.hidden_layers[-1], self.output))
+            layers.append(torch.nn.Linear(self.hidden_layers[-1], self.output))
 
-            self.net = nn.Sequential(*layers)
+            self.net = torch.nn.Sequential(*layers)
             self.net.to(self.device)
 
     def print_network(self):
@@ -203,10 +173,10 @@ class PINN():
         print("----------")
         layer_num = 0
         for i, layer in enumerate(self.net):
-            if isinstance(layer, nn.Linear) or isinstance(layer, SineLayer):
+            if isinstance(layer, torch.nn.Linear) or isinstance(layer, siren.SineLayer):
                 next_layer = self.net[i + 1] if i + 1 < len(self.net) else None
             
-                if next_layer and isinstance(next_layer, nn.Module):
+                if next_layer and isinstance(next_layer, torch.nn.Module):
                     print(f"Layer {layer_num}: {layer} -> {next_layer.__class__.__name__}")
                 else:
                     print(f"Layer {layer_num}: {layer}")
@@ -239,7 +209,7 @@ class PINN():
             sampled_x, sampled_t, sampled_u = self.sample_training_data(self.x_initial, 
                                                                         self.t_initial, 
                                                                         self.u_initial, 
-                                                                        self.num_samples)
+                                                                        self.batch_size)
             u_prediction = self.function(sampled_x, sampled_t)
             initial_loss = self.mse(u_prediction, sampled_u)
         else:
@@ -251,7 +221,7 @@ class PINN():
             sampled_x, sampled_t, sampled_u = self.sample_training_data(self.x_boundary, 
                                                                         self.t_boundary, 
                                                                         self.u_boundary, 
-                                                                        self.num_samples)
+                                                                        self.batch_size)
             u_prediction = self.function(sampled_x, sampled_t)
             boundary_loss = self.mse(u_prediction, sampled_u)
         else:
@@ -263,15 +233,17 @@ class PINN():
             sampled_x, sampled_t = self.sample_training_data(self.x_equation,
                                                              self.t_equation,
                                                              None,
-                                                             self.num_samples)
+                                                             self.batch_size)
             _, dudt, d2udx2 = self.function(sampled_x, sampled_t, is_equation=True)
         else:
             _, dudt, d2udx2 = self.function(self.x_equation, self.t_equation, is_equation=True)
-        heat_eq_prediction = dudt - self.alpha**2 * d2udx2
+        heat_eq_prediction = pde(dudt, d2udx2, self.alpha)
         equation_loss = self.mse(heat_eq_prediction, self.null)
 
         # Total loss
-        self.loss = 10 * initial_loss + 1000 * boundary_loss + 10 * equation_loss
+        self.loss = (self.weight_ic * initial_loss + 
+                     self.weight_bc * boundary_loss + 
+                     self.weight_eq * equation_loss)
 
         # Derivative with respect to weights
         self.loss.backward()
@@ -279,9 +251,14 @@ class PINN():
 
         self.iter += 1
 
+        # Weighs calibration
+        if self.iter % 100 == 0:
+            self.adjust_weights([self.weight_ic, self.weight_bc, self.weight_eq], 
+                                [initial_loss, boundary_loss, equation_loss])
+
         if self.iter % 100 == 0:
             # Write to file
-            with open(f'{self.output_folder}/HL_{len(self.hidden_layers)}_A_{self.activation}_N_{self.hidden_layers[-1]}.csv', 'a') as f:
+            with open(f'{self.output_path}/HL_{len(self.hidden_layers)}_A_{self.activation}_N_{self.hidden_layers[-1]}.csv', 'a') as f:
                 f.write(f"{self.iter}, {self.loss}\n")
 
             # print('Iteration: {:}, Loss: {:0.6f}'.format(self.iter, self.loss))
@@ -295,7 +272,7 @@ class PINN():
         return self.loss
     
     def get_loss_history(self):
-        return f'{self.output_folder}/HL_{len(self.hidden_layers)}_A_{self.activation}_N_{self.hidden_layers[-1]}.csv'
+        return f'{self.output_path}/HL_{len(self.hidden_layers)}_A_{self.activation}_N_{self.hidden_layers[-1]}.csv'
 
     def train(self):
         # Training loop
@@ -305,7 +282,7 @@ class PINN():
         # For Adam
         # early_stopping = EarlyStopping(patience=10, min_delta=0.0001)
 
-        for epoch in range(self.num_epochs):
+        for epoch in range(self.epochs):
             self.optimizer.step(self.closure)
             # current_loss = self.closure()
             # early_stopping(current_loss)
@@ -326,19 +303,3 @@ class PINN():
         self.net.train()
 
         return u_pred
-
-    def plot_test(self, x_test, u_test, iter):
-        fig = plt.figure()
-
-        x_test_cpu = x_test.cpu().detach().numpy()
-        u_test_cpu = u_test.cpu().detach().numpy()
-
-        plt.plot(x_test_cpu, u_test_cpu)
-        plt.xlim(0, 1)
-        plt.ylim(-0.1, 1.1)
-        plt.grid()   
-        plt.title(f'PINN Solution {iter}')
-        plt.xlabel('x')
-        plt.ylabel('u')
-        plt.savefig(os.path.join(self.output_folder, f'{str(self.iter).zfill(5)}.png'))
-        plt.close(fig)

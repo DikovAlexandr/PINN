@@ -3,26 +3,6 @@ import time
 import numpy as np
 
 
-class EarlyStopping:
-    def __init__(self, patience=100, min_delta=0.0001):
-        self.patience = patience
-        self.min_delta = min_delta
-        self.counter = 0
-        self.best_loss = None
-        self.early_stop = False
-
-    def __call__(self, current_loss):
-        if self.best_loss is None:
-            self.best_loss = current_loss
-        elif current_loss > self.best_loss - self.min_delta:
-            self.counter += 1
-            if self.counter >= self.patience:
-                self.early_stop = True
-        else:
-            self.best_loss = current_loss
-            self.counter = 0
-
-
 class ModelCheckpoint:
     def __init__(self, filepath, verbose=0, 
                  save_better_only=False, period=1, monitor="train loss"):

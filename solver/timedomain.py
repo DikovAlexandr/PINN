@@ -25,7 +25,8 @@ class TimeDomain:
             t_inners = (torch.rand(num_points, device=device) * 
                         (self.t1 - self.t0) + self.t0)
         else:
-            t_inners = torch.linspace(self.t0, self.t1, num_points, device=device)
+            t_inners = torch.linspace(self.t0, self.t1, 
+                                      num_points, device=device)
 
             # Calculate spacing
             self.spacing = (t_inners[1] - t_inners[0]).item()

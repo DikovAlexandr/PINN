@@ -8,6 +8,9 @@ class Geometry1D:
     def length(self) -> float:
         pass
     
+    def limits(self) -> Tuple[float, float]:
+        pass
+
     def inside(self, x) -> bool:
         pass
 
@@ -36,6 +39,9 @@ class Geometry1D:
 
 class Geometry2D:
     def inside(self, x) -> bool:
+        pass
+
+    def limits(self) -> Tuple[Tuple[float, float], Tuple[float, float]]:
         pass
 
     def boundary(self, num_points, 
@@ -76,12 +82,15 @@ class Interval(Geometry1D):
     def length(self) -> float:
         return self.x_right - self.x_left
     
+    def limits(self) -> Tuple[float, float]:
+        return (self.x_left, self.x_right)
+    
     def inside(self, x) -> bool:
         return (x >= self.x_left) & (x <= self.x_right)
 
     def boundary(self, num_points, device="cuda:0", random=False) -> torch.Tensor:
-        x_boundary_right = torch.ones(num_points, device=device) * self.x_right
-        x_boundary_left = torch.ones(num_points, device=device) * self.x_left
+        x_boundary_right = torch.ones(int(num_points/2), device=device) * self.x_right
+        x_boundary_left = torch.ones(int(num_points/2), device=device) * self.x_left
         self.boundary_points = torch.cat([x_boundary_right, x_boundary_left])
         return self.boundary_points.requires_grad_(True)
     
@@ -130,6 +139,9 @@ class Rectangle(Geometry2D):
     
     def size (self) -> Tuple[float, float]:
         return (self.x_max - self.x_min, self.y_max - self.y_min)
+    
+    def limits(self) -> Tuple[Tuple[float, float], Tuple[float, float]]:
+        return ((self.x_min, self.x_max), (self.y_min, self.y_max))
 
     def inside(self, x) -> bool:
         x = np.asarray(x)
@@ -250,6 +262,10 @@ class Ellipse(Geometry2D):
     def __str__(self) -> str:
         return (f"Ellipse(x_center={self.x_center}, y_center={self.y_center}, "
                 f"x_radius={self.x_radius}, y_radius={self.y_radius})")
+    
+    def limits(self) -> Tuple[Tuple[float]]:
+        return ((self.x_center - self.x_radius, self.x_center + self.x_radius),
+                (self.y_center - self.y_radius, self.y_center + self.y_radius))
 
     def inside(self, x) -> bool:
         x = np.asarray(x)
