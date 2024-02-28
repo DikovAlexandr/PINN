@@ -5,15 +5,34 @@ import numpy as np
 
 
 class NetParams:
-    def __init__(self, input, output, hidden_layers, iterations, batch_size, 
+    def __init__(self):
+        self.input = None
+        self.output = None
+        self.hidden_layers = None
+
+        self.epochs = None
+        self.batch_size = None
+        self.learning_rate = None
+        self.activation = None
+        self.training_mode = None
+        self.optimizer = None
+        
+        self.display_interval = None
+        self.model_save_path = None
+        self.output_path = None
+        self.initial_weights_path = None
+
+        self.siren_params = None
+
+    def set_params(self, input, output, hidden_layers, epochs, batch_size, 
                  learning_rate, activation, training_mode, optimizer, 
-                 display_interval, model_save_path, initial_weights_path, siren_params):
+                 display_interval, model_save_path, output_path, initial_weights_path, siren_params):
         """
         Args:
             input: The input dimension of the model.
             output: The output dimension of the model.
             hidden_layers: A list of integers representing the number of neurons in each hidden layer.
-            iterations: The number of iterations for training.
+            epochs: The number of epochs for training.
             batch_size: The number of samples per batch.
             learning_rate: The learning rate for the model.
             activation: The activation function for the hidden layers.
@@ -21,16 +40,16 @@ class NetParams:
             optimizer: The optimizer for model training.
             display_interval: The interval for displaying training progress.
             model_save_path: The path to save the trained model.
+            output_path: The path to save the output.
             initial_weights_path: The path to load initial weights for the model.
             siren_params: Additional parameters for the SIREN model.
         """
-
         # TODO: add constructor as "[2] + [20] * 3 + [1]"
         self.input = input
         self.output = output
         self.hidden_layers = hidden_layers
 
-        self.iterations = iterations
+        self.epochs = epochs
         self.batch_size = batch_size
         self.learning_rate = learning_rate
         self.activation = activation
@@ -39,13 +58,14 @@ class NetParams:
         
         self.display_interval = display_interval
         self.model_save_path = model_save_path
+        self.output_path = output_path
         self.initial_weights_path = initial_weights_path
 
         if siren_params == None:
             self.siren_params = None
         else:
             self.siren_params = siren_params
-    
+
     @classmethod
     def from_json_file(cls, file_path):
         with open(file_path, "r") as json_file:
@@ -55,7 +75,7 @@ class NetParams:
             input=config_data["input"],
             output=config_data["output"],
             hidden_layers=config_data["hidden_layers"],
-            iterations=config_data["iterations"],
+            epochs=config_data["epochs"],
             batch_size=config_data["batch_size"],
             learning_rate=config_data["learning_rate"],
             activation=config_data["activation"],
@@ -63,6 +83,7 @@ class NetParams:
             optimizer=config_data["optimizer"],
             display_interval=config_data["display_interval"],
             model_save_path=config_data["model_save_path"],
+            output_path=config_data["output_path"],
             initial_weights_path=config_data["initial_weights_path"],
             siren_params=config_data["siren_params"]
         )
