@@ -26,9 +26,11 @@ class NetParams:
 
         self.siren_params = None
 
-    def set_params(self, input, output, hidden_layers, epochs, batch_size, 
-                 learning_rate, activation, training_mode, optimizer, 
-                 display_interval, model_save_path, output_path, initial_weights_path, siren_params):
+    def set_params(self, input, output, hidden_layers, 
+                   epochs, batch_size, 
+                   learning_rate, activation, training_mode, optimizer, 
+                   display_interval, model_save_path, output_path, initial_weights_path, 
+                   siren_params):
         """
         Args:
             input: The input dimension of the model.

@@ -73,12 +73,12 @@ class Test(MathConditions):
 
 
 class Problem:
-    def __init__(self, initial_conditions, boundary_conditions, test,
+    def __init__(self, initial_conditions, boundary_conditions,
                  equation, geom, time, alpha):
         self.initial_conditions = initial_conditions
         self.boundary_conditions = boundary_conditions
         self.equation = equation
-        self.test = test
+        # self.test = test
         self.geom = geom
         self.time = time
         self.alpha = alpha
