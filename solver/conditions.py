@@ -36,6 +36,7 @@ class InitialConditions(MathConditions):
         self.x = geom.inners(num_points, device=device, random=random)
         self.t = time.initial(num_points, device=device, random=random)
         self.u = initial_func(self.x)
+        self.initial_func = initial_func
     
     def get_initial_conditions(self):
         return self.x, self.t, self.u
@@ -55,6 +56,7 @@ class BoundaryConditions(MathConditions):
         self.x = x.flatten()
         self.t = t.flatten()
         self.u = boundary_func(self.x, self.t)
+        self.boundary_func = boundary_func
 
     def get_boundary_conditions(self):
         return self.x, self.t, self.u
@@ -96,14 +98,14 @@ class Problem:
             if t == 0:
                 plt.scatter(self.to_numpy(x_ic),
                             self.to_numpy(u_ic),
-                            marker='o', label="IC")
+                            marker='x', label="IC", linewidths=1)
                 plt.scatter(self.to_numpy(x_bc[time_index]),
                             self.to_numpy(u_bc[time_index]),
-                            marker='o', label="BC")
+                            marker='o', label="BC", linewidths=3)
             else:
                 plt.scatter(self.to_numpy(x_bc[time_index]),
                             self.to_numpy(u_bc[time_index]),
-                            marker='o', label="BC")
+                            marker='o', label="BC", linewidths=3)
             plt.xlim(self.geom.limits()[0], self.geom.limits()[1])
             plt.ylim(0, max(self.to_numpy(u_ic).max(),
                             self.to_numpy(u_bc).max()))
@@ -115,16 +117,16 @@ class Problem:
                 plt.scatter(self.to_numpy(x_ic[:, 0]),
                             self.to_numpy(x_ic[:, 1]),
                             c=u_ic, cmap='viridis',
-                            marker='o', label="IC")
+                            marker='x', label="IC", linewidths=1)
                 plt.scatter(self.to_numpy(x_bc[:, 0][time_index]),
                             self.to_numpy(x_bc[:, 1][time_index]),
                             c=u_bc[time_index], cmap='viridis',
-                            marker='o', label="BC")
+                            marker='o', label="BC", linewidths=3)
             else:
                 plt.scatter(self.to_numpy(x_bc[:, 0][time_index]),
                             self.to_numpy(x_bc[:, 1][time_index]),
                             c=u_bc[time_index], cmap='viridis',
-                            marker='o', label="BC")
+                            marker='o', label="BC", linewidths=3)
             plt.xlim(self.geom.limits()[0][0], 
                      self.geom.limits()[0][1])
             plt.ylim(self.geom.limits()[1][0], 

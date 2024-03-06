@@ -21,6 +21,7 @@
 
 ## References
 - [**SIREN**](https://github.com/vsitzmann/siren/tree/master)
+- [PyTorch Adam vs LBFGS](https://github.com/youli-jlu/PyTorch_Adam_vs_LBFGS)
 - [2D Heat Transfer GitHub Repository](https://github.com/Samson-Mano/2D_Heat_transfer)
 - [Computational Domain - YouTube Video](https://www.youtube.com/watch?v=ISp-hq6AH3Q&t=211s&ab_channel=ComputationalDomain)
 - [Introduction to Heat Transfer](https://inductiva.ai/blog/article/heat-1-an-introduction)
