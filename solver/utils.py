@@ -18,7 +18,12 @@ class NetParams:
         self.activation = None
         self.training_mode = None
         self.optimizer = None
-        
+
+        self.early_stopping = None
+        self.start_weights = None
+        self.use_rar = None
+        self.use_loss_weight_adjuster = None
+
         self.display_interval = None
         self.model_save_path = None
         self.output_path = None
@@ -29,6 +34,7 @@ class NetParams:
     def set_params(self, input, output, hidden_layers, 
                    epochs, batch_size, 
                    learning_rate, activation, training_mode, optimizer, 
+                   early_stopping, start_weights, use_rar, use_loss_weight_adjuster,
                    display_interval, model_save_path, output_path, initial_weights_path, 
                    siren_params):
         """
@@ -42,6 +48,10 @@ class NetParams:
             activation: The activation function for the hidden layers.
             training_mode: The mode of training, e.g., 'train' or 'test'.
             optimizer: The optimizer for model training.
+            early_stopping: Boolean indicating whether to use early stopping.
+            start_weights: Path to initial weights for the model.
+            use_rar: Boolean indicating whether to use relative angular representations.
+            use_loss_weight_adjuster: Boolean indicating whether to use the loss weight adjuster.
             display_interval: The interval for displaying training progress.
             model_save_path: The path to save the trained model.
             output_path: The path to save the output.
@@ -59,7 +69,12 @@ class NetParams:
         self.activation = activation
         self.training_mode = training_mode
         self.optimizer = optimizer
-        
+
+        self.early_stopping = early_stopping
+        self.start_weights = start_weights
+        self.use_rar = use_rar
+        self.use_loss_weight_adjuster = use_loss_weight_adjuster
+
         self.display_interval = display_interval
         self.model_save_path = model_save_path
         self.output_path = output_path
@@ -85,6 +100,10 @@ class NetParams:
             activation=config_data["activation"],
             training_mode=config_data["training_mode"],
             optimizer=config_data["optimizer"],
+            early_stopping=config_data["early_stopping"],
+            start_weights=config_data["start_weights"],
+            use_rar=config_data["use_rar"],
+            use_loss_weight_adjuster=config_data["use_loss_weight_adjuster"],
             display_interval=config_data["display_interval"],
             model_save_path=config_data["model_save_path"],
             output_path=config_data["output_path"],

@@ -84,64 +84,18 @@ class Problem:
         self.geom = geom
         self.time = time
         self.alpha = alpha
-        
-    def to_numpy(self, tensor):
-        return tensor.cpu().detach().numpy()
 
-    def visualize(self, t, output_folder=None):
-        x_ic, _, u_ic = self.initial_conditions.get_initial_conditions()
-        x_bc, t_bc, u_bc = self.boundary_conditions.get_boundary_conditions()
-        time_index = self.find_index(t_bc, t)
+    def get_problem(self):
+        pass
 
-        if len(x_ic.shape) == 1:
-            # 1D problem
-            if t == 0:
-                plt.scatter(self.to_numpy(x_ic),
-                            self.to_numpy(u_ic),
-                            marker='x', label="IC", linewidths=1)
-                plt.scatter(self.to_numpy(x_bc[time_index]),
-                            self.to_numpy(u_bc[time_index]),
-                            marker='o', label="BC", linewidths=3)
-            else:
-                plt.scatter(self.to_numpy(x_bc[time_index]),
-                            self.to_numpy(u_bc[time_index]),
-                            marker='o', label="BC", linewidths=3)
-            plt.xlim(self.geom.limits()[0], self.geom.limits()[1])
-            plt.ylim(0, max(self.to_numpy(u_ic).max(),
-                            self.to_numpy(u_bc).max()))
-            plt.xlabel("x")
-            plt.ylabel("u")
-        else:
-            # 2D problem
-            if t == 0:
-                plt.scatter(self.to_numpy(x_ic[:, 0]),
-                            self.to_numpy(x_ic[:, 1]),
-                            c=u_ic, cmap='viridis',
-                            marker='x', label="IC", linewidths=1)
-                plt.scatter(self.to_numpy(x_bc[:, 0][time_index]),
-                            self.to_numpy(x_bc[:, 1][time_index]),
-                            c=u_bc[time_index], cmap='viridis',
-                            marker='o', label="BC", linewidths=3)
-            else:
-                plt.scatter(self.to_numpy(x_bc[:, 0][time_index]),
-                            self.to_numpy(x_bc[:, 1][time_index]),
-                            c=u_bc[time_index], cmap='viridis',
-                            marker='o', label="BC", linewidths=3)
-            plt.xlim(self.geom.limits()[0][0], 
-                     self.geom.limits()[0][1])
-            plt.ylim(self.geom.limits()[1][0], 
-                     self.geom.limits()[1][1])
-            plt.colorbar(label='u')
-            plt.xlabel("x")
-            plt.ylabel("y")
-        plt.legend()
+class Solution:
+    def __init__(self):
+        pass
 
-        # Save the figure or display it
-        if output_folder:
-            plt.savefig(output_folder)
-            plt.show()
-        else:
-            plt.show()
+    def set_solution(self, x, t, u):
+        self.x = x
+        self.t = t
+        self.u = u
 
-    def find_index(self, array, value):
-        return torch.where(torch.abs(array - value) <= 0.5 * self.time.grid_spacing_inners())[0]
+    def get_solution(self):
+        return self.x, self.t, self.u
