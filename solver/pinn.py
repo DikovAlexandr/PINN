@@ -37,7 +37,7 @@ class PINN():
         self.x_equation, self.t_equation = problem.equation.get_equation()
 
         # Coefficient of thermal diffusivity
-        self.alpha = problem.alpha 
+        self.alpha = problem.alpha
 
         # Device
         self.device = device
@@ -49,35 +49,52 @@ class PINN():
             self.hidden_omega_0 = net_params.siren_params.hidden_omega_0
             self.outermost_linear = net_params.siren_params.outermost_linear
 
-        # Initialize network:
+        # Construct network:
         self.input = net_params.input
         self.output = net_params.output
         self.hidden_layers = net_params.hidden_layers
-        self.activation = net_params.activation
+
+        # Activation function
+        activations = {
+            'relu': torch.nn.ReLU(),
+            'tanh': torch.nn.Tanh(),
+            'sigmoid': torch.nn.Sigmoid(),
+            'sin': siren.Sin()
+        }
+        if net_params.activation in activations:
+            self.activation = activations[net_params.activation]
+        else:
+            raise ValueError(f"Unsupported activation function: {net_params.activation}")
+        
+        # Initialize network
         self.network()
         self.print_network()
 
         # Optimizer
         if net_params.optimizer == 'LBFGS':
             self.optimizer = torch.optim.LBFGS(self.net.parameters(), 
-                                                lr=1,
-                                                max_iter=10000, 
-                                                max_eval=100000,
-                                                history_size=100, 
-                                                tolerance_grad=1e-15, 
-                                                tolerance_change=0.5 * np.finfo(float).eps,
-                                                line_search_fn="strong_wolfe")
-        elif net_params.optimizer == 'Adam':
-            self.optimizer = torch.optim.Adam(self.net.parameters(), lr=1e-3)
-        elif net_params.optimizer == 'Adam+LBFGS':
-            # TODO: Implement Adam+LBFGS optimizer
-            pass
+                                               lr=net_params.learning_rate)
+            # From Navier-Stokes:
+            # lr=1, max_iter=10000, max_eval=100000, history_size=100, tolerance_grad=1e-15, 
+            # tolerance_change=0.5 * np.finfo(float).eps, line_search_fn="strong_wolfe")
 
-        # From: https://github.com/omniscientoctopus/Physics-Informed-Neural-Networks/blob/main/PyTorch/Burgers'%20Equation/Burgers.ipynb
-        # optimizer = torch.optim.LBFGS(PINN.parameters(), lr=0.1, 
-        #                               max_iter = 250, max_eval = None, 
-        #                               tolerance_grad = 1e-05, tolerance_change = 1e-09, 
-        #                               history_size = 100, line_search_fn = 'strong_wolfe')
+            # From: https://github.com/omniscientoctopus/Physics-Informed-Neural-Networks/blob/main/PyTorch/Burgers'%20Equation/Burgers.ipynb
+            # lr=0.1,  max_iter = 250, max_eval = None, tolerance_grad = 1e-05, 
+            # tolerance_change = 1e-09, history_size = 100, line_search_fn = 'strong_wolfe')
+        elif net_params.optimizer == 'Adam':
+            self.optimizer = torch.optim.Adam(self.net.parameters(), 
+                                              lr=net_params.learning_rate)
+        elif net_params.optimizer == 'Hybrid':
+            # TODO: Implement Adam+LBFGS optimizer
+            self.optimizer = enhancements.HybridOptimizer(self.net.parameters(),
+                                                           self.criterion,
+                                                           optim_adam=torch.optim.Adam(self.net.parameters(), 
+                                                                                       lr=1e-3),
+                                                           optim_lbfgs=torch.optim.LBFGS(self.net.parameters(), 
+                                                                                         lr=1e-3),
+                                                           switch_epoch=2000,
+                                                           switch_threshold=1e-3,
+                                                           early_stopping=True)        
 
         # Number of epochs
         self.epochs = net_params.epochs 
@@ -99,27 +116,31 @@ class PINN():
 
         # Loss
         self.loss = 0
+        self.save_loss = net_params.save_loss
 
         # Loss weights
-        self.weight_eq = 1
-        self.weight_bc = 1
-        self.weight_ic = 1
+        self.weight_eq = 1000
+        self.weight_bc = 1000
+        self.weight_ic = 1000
 
         # Weights adjustment
-        self.adjust_weights = enhancements.LossWeightAdjuster(1e6, 1e-6, 1e-8, 10)
+        if net_params.use_weights_adjuster:
+            self.adjuster = enhancements.LossWeightAdjuster(1e6, 1e-6, 1e-3, 10)
+        else:
+            self.adjuster = None
 
         # Save plots
         self.output_path = net_params.output_path
         utils.create_or_clear_folder(self.output_path)
 
-    def sample_training_data(self, x, t, u=None):
+        # Initial weights for fine tuning
+        if net_params.initial_weights_path:
+            self.load_weights = net_params.initial_weights_path
+
+    def randomize_data(self, x, t, u=None):
         # Get the total number of examples
         total_examples = x.shape[0]
-
-        # Generate random indices for sampling
         random_indices = torch.randperm(total_examples)[:self.batch_size].to(self.device)
-
-        # Sample the data
         sampled_x = x[random_indices, :]
         sampled_t = t[random_indices, :]
 
@@ -129,8 +150,27 @@ class PINN():
             sampled_u = u[random_indices, :]
             return sampled_x, sampled_t, sampled_u
         
+    def sort_data(self, x, t, u=None):
+        # Sort the data by t and x in ascending order
+        if u is None:
+            combined_tensors = list(zip(x, t))
+            combined_tensors.sort(key=lambda item: (item[1], item[0]))
+            sorted_x, sorted_t = zip(*combined_tensors)
+            sorted_x = torch.tensor(sorted_x).to(self.device)
+            sorted_t = torch.tensor(sorted_t).to(self.device)
+            return sorted_x, sorted_t
+        else:
+            combined_tensors = list(zip(x, t, u))
+            combined_tensors.sort(key=lambda item: (item[1], item[0]))
+            sorted_x, sorted_t, sorted_u = zip(*combined_tensors)
+            sorted_x = torch.tensor(sorted_x).to(self.device)
+            sorted_t = torch.tensor(sorted_t).to(self.device)
+            sorted_u = torch.tensor(sorted_u).to(self.device)
+            return sorted_x, sorted_t, sorted_u
+        
     def network(self):
-        if self.activation == "sin":
+        if self.activation is siren.Sin():
+            # SIREN
             # First linear layer
             layers = [siren.SineLayer(self.input, self.hidden_layers[0], 
                                       is_first=True, omega_0=self.first_omega_0)]
@@ -150,20 +190,21 @@ class PINN():
             else:
                 layers.append(siren.SineLayer(self.hidden_layers[-1], self.output, 
                                               is_first=False, omega_0=self.hidden_omega_0))
-            
-            self.net = torch.nn.Sequential(*layers)
-            self.net.to(self.device)
         else:
+            # FCN
+            # First linear layer
             layers = [torch.nn.Linear(self.input, self.hidden_layers[0]), self.activation]
 
+            # Hidden layers
             for i in range(1, len(self.hidden_layers)):
                 layers.append(torch.nn.Linear(self.hidden_layers[i-1], self.hidden_layers[i]))
                 layers.append(self.activation)
             
+            # Last linear layer
             layers.append(torch.nn.Linear(self.hidden_layers[-1], self.output))
 
-            self.net = torch.nn.Sequential(*layers)
-            self.net.to(self.device)
+        self.net = torch.nn.Sequential(*layers)
+        self.net.to(self.device)
 
     def print_network(self):
         print("Activation Function:", self.activation.__class__.__name__)
@@ -184,7 +225,7 @@ class PINN():
         print("----------")
 
     def function(self, x, t, is_equation=False):
-        u_pred = self.net(torch.hstack((x, t)))
+        u_pred = self.net(torch.stack((x, t)).T)
 
         if is_equation:
             dudx = torch.autograd.grad(u_pred, x, 
@@ -206,7 +247,7 @@ class PINN():
 
         # Initial loss
         if self.training_mode == 'sample':
-            sampled_x, sampled_t, sampled_u = self.sample_training_data(self.x_initial, 
+            sampled_x, sampled_t, sampled_u = self.randomize_data(self.x_initial, 
                                                                         self.t_initial, 
                                                                         self.u_initial, 
                                                                         self.batch_size)
@@ -218,7 +259,7 @@ class PINN():
 
         # Boundary loss
         if self.training_mode == 'sample':
-            sampled_x, sampled_t, sampled_u = self.sample_training_data(self.x_boundary, 
+            sampled_x, sampled_t, sampled_u = self.randomize_data(self.x_boundary, 
                                                                         self.t_boundary, 
                                                                         self.u_boundary, 
                                                                         self.batch_size)
@@ -230,7 +271,7 @@ class PINN():
 
         # Equation loss
         if self.training_mode == 'sample':    
-            sampled_x, sampled_t = self.sample_training_data(self.x_equation,
+            sampled_x, sampled_t = self.randomize_data(self.x_equation,
                                                              self.t_equation,
                                                              None,
                                                              self.batch_size)
@@ -246,35 +287,43 @@ class PINN():
                      self.weight_eq * equation_loss)
 
         # Derivative with respect to weights
-        self.loss.backward()
+        self.loss.backward(retain_graph=True) # WHERE MUST BE BACKWARD?
         self.optimizer.step()
 
         self.iter += 1
 
         # Weighs calibration
-        if self.iter % 100 == 0:
-            self.adjust_weights([self.weight_ic, self.weight_bc, self.weight_eq], 
-                                [initial_loss, boundary_loss, equation_loss])
+        if self.iter % 10 == 0 and self.adjuster is not None:
+            print("Adjusting weights...")
+            [self.weight_ic, self.weight_bc, self.weight_eq] = self.adjuster.adjust_weights([self.weight_ic, self.weight_bc, self.weight_eq], 
+                                                                                          [initial_loss, boundary_loss, equation_loss])
+            
+        if self.iter % 20 == 0:
+            print('Iteration: {:}, Loss: {:0.6f}'.format(self.iter, self.loss))
+            # print('Weights: {:0.6f}, {:0.6f}, {:0.6f}'.format(self.weight_ic, self.weight_bc, self.weight_eq))
 
-        if self.iter % 100 == 0:
-            # Write to file
-            with open(f'{self.output_path}/HL_{len(self.hidden_layers)}_A_{self.activation}_N_{self.hidden_layers[-1]}.csv', 'a') as f:
-                f.write(f"{self.iter}, {self.loss}\n")
+        # if self.iter % 100 == 0:
+        #     # Write to file
+        #     with open(f'{self.output_path}/HL_{len(self.hidden_layers)}_A_{self.activation}_N_{self.hidden_layers[-1]}.csv', 'a') as f:
+        #         f.write(f"{self.iter}, {self.loss}\n")
 
-            # print('Iteration: {:}, Loss: {:0.6f}'.format(self.iter, self.loss))
+        #     # print('Iteration: {:}, Loss: {:0.6f}'.format(self.iter, self.loss))
 
-            test = set_test(self.size, self.equation_points, 0.5)
-            u_test = self.predict(test.x, test.t)
+        #     test = set_test(self.size, self.equation_points, 0.5)
+        #     u_test = self.predict(test.x, test.t)
 
-            # Plot numerical vs analytical solution
-            self.plot_test(test.x, u_test, self.iter)
+        #     # Plot numerical vs analytical solution
+        #     self.plot_test(test.x, u_test, self.iter)
 
         return self.loss
     
     def get_loss_history(self):
-        return f'{self.output_path}/HL_{len(self.hidden_layers)}_A_{self.activation}_N_{self.hidden_layers[-1]}.csv'
-
+        if self.save_loss:
+            return f'{self.output_path}/HL_{len(self.hidden_layers)}_A_{self.activation}_N_{self.hidden_layers[-1]}.csv'
+        else:
+            return None
     def train(self):
+        self.net.train()
         # Training loop
         self.net.train()
         # self.optimizer.step(self.closure)
@@ -292,14 +341,9 @@ class PINN():
             #     break
 
     def predict(self, x, t):
-        x = torch.tensor(x[:, np.newaxis], dtype=torch.float32, requires_grad=True)
-        t = torch.tensor(t[:, np.newaxis], dtype=torch.float32, requires_grad=True)
-        
         self.net.eval()
 
         with torch.no_grad():
             u_pred = self.function(x, t)
-
-        self.net.train()
 
         return u_pred

@@ -1,7 +1,6 @@
 import os
 import torch
 import numpy as np
-from torch import nn
 
 class SirenParams:
     def __init__(self, first_omega_0, hidden_omega_0, outermost_linear):
@@ -9,7 +8,7 @@ class SirenParams:
         self.hidden_omega_0 = hidden_omega_0
         self.outermost_linear = outermost_linear
 
-class SineLayer(nn.Module):
+class SineLayer(torch.nn.Module):
     def __init__(self, input, output, bias=True,
                  is_first=False, omega_0=30):
         super().__init__()
@@ -17,7 +16,7 @@ class SineLayer(nn.Module):
         self.is_first = is_first
         
         self.in_features = input
-        self.linear = nn.Linear(input, output, bias=bias)
+        self.linear = torch.nn.Linear(input, output, bias=bias)
         
         self.init_weights()
     
@@ -32,3 +31,7 @@ class SineLayer(nn.Module):
         
     def forward(self, input):
         return torch.sin(self.omega_0 * self.linear(input))
+    
+class Sin():
+    def __init__(self):
+        pass

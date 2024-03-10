@@ -34,9 +34,9 @@ class NetParams:
     def set_params(self, input, output, hidden_layers, 
                    epochs, batch_size, 
                    learning_rate, activation, training_mode, optimizer, 
-                   early_stopping, start_weights, use_rar, use_loss_weight_adjuster,
-                   display_interval, model_save_path, output_path, initial_weights_path, 
-                   siren_params):
+                   early_stopping, start_weights, use_rar, use_weights_adjuster,
+                   display_interval, model_save_path, output_path, save_loss,
+                   initial_weights_path, siren_params):
         """
         Args:
             input: The input dimension of the model.
@@ -51,10 +51,11 @@ class NetParams:
             early_stopping: Boolean indicating whether to use early stopping.
             start_weights: Path to initial weights for the model.
             use_rar: Boolean indicating whether to use relative angular representations.
-            use_loss_weight_adjuster: Boolean indicating whether to use the loss weight adjuster.
+            use_weights_adjuster: Boolean indicating whether to use the loss weight adjuster.
             display_interval: The interval for displaying training progress.
             model_save_path: The path to save the trained model.
             output_path: The path to save the output.
+            save_loss: Boolean indicating whether to save the loss.
             initial_weights_path: The path to load initial weights for the model.
             siren_params: Additional parameters for the SIREN model.
         """
@@ -73,11 +74,12 @@ class NetParams:
         self.early_stopping = early_stopping
         self.start_weights = start_weights
         self.use_rar = use_rar
-        self.use_loss_weight_adjuster = use_loss_weight_adjuster
+        self.use_weights_adjuster = use_weights_adjuster
 
         self.display_interval = display_interval
         self.model_save_path = model_save_path
         self.output_path = output_path
+        self.save_loss = save_loss,
         self.initial_weights_path = initial_weights_path
 
         if siren_params == None:
@@ -103,10 +105,11 @@ class NetParams:
             early_stopping=config_data["early_stopping"],
             start_weights=config_data["start_weights"],
             use_rar=config_data["use_rar"],
-            use_loss_weight_adjuster=config_data["use_loss_weight_adjuster"],
+            use_weights_adjuster=config_data["use_weights_adjuster"],
             display_interval=config_data["display_interval"],
             model_save_path=config_data["model_save_path"],
             output_path=config_data["output_path"],
+            save_loss=config_data["save_loss"],
             initial_weights_path=config_data["initial_weights_path"],
             siren_params=config_data["siren_params"]
         )
@@ -213,14 +216,15 @@ def loss_history_plot(data_path, output_folder, is_log=False, title='LossHistory
     Returns:
         None
     """
-    loss_history = pd.read_csv(data_path, header=None)
-    if is_log:
-        plt.semilogy(loss_history[0], loss_history[1])
-        plt.ylabel('Logarithmic Loss')
-    else:
-        plt.plot(loss_history[0], loss_history[1])
-        plt.ylabel('Loss')
-    plt.xlabel('Epoch')
-    plt.title(title)
-    plt.savefig(os.path.join(output_folder, title + '.png'))
-    plt.show()
+    if os.path.exists(data_path):
+        loss_history = pd.read_csv(data_path, header=None)
+        if is_log:
+            plt.semilogy(loss_history[0], loss_history[1])
+            plt.ylabel('Logarithmic Loss')
+        else:
+            plt.plot(loss_history[0], loss_history[1])
+            plt.ylabel('Loss')
+        plt.xlabel('Epoch')
+        plt.title(title)
+        plt.savefig(os.path.join(output_folder, title + '.png'))
+        plt.show()

@@ -15,10 +15,10 @@ class TimeDomain:
         return (t >= self.t0) & (t <= self.t1)
     
     def initial(self, num_points, device="cuda:0", random=False): 
-        return torch.ones(num_points, device=device) * self.t0
+        return torch.ones(num_points, device=device).requires_grad_(True) * self.t0
     
     def final(self, num_points, device="cuda:0", random=False):
-        return torch.ones(num_points, device=device) * self.t1
+        return torch.ones(num_points, device=device).requires_grad_(True) * self.t1
     
     def inners(self, num_points, device="cuda:0", random=False):
         if random:
@@ -30,7 +30,7 @@ class TimeDomain:
 
             # Calculate spacing
             self.spacing = (t_inners[1] - t_inners[0]).item()
-        return t_inners
+        return t_inners.requires_grad_(True)
     
     def grid_spacing_inners(self):
         return self.spacing

@@ -1,5 +1,5 @@
 import numpy as np
-
+import torch
 
 # Class for loss weight adjustment based on the loss values
 class LossWeightAdjuster:
@@ -10,12 +10,14 @@ class LossWeightAdjuster:
         self.scaling_factor = scaling_factor
 
     def adjust_weights(self, weights, losses):
+        print(weights, losses)
         for i in range(len(weights)):
             if losses[i] < self.threshold:
                 weights[i] = weights[i] / self.scaling_factor
             else:
                 weights[i] = losses[i] * self.scaling_factor
             weights[i] = max(self.min_weight, min(weights[i], self.max_weight))
+        return weights
 
 # Collocation points resampling algorithm based on the RAR from the paper "DeepXDE"
 def rar_points(geom, period, X, T, errors, num_points, epsilon, random=True):
@@ -60,12 +62,21 @@ def rar_points(geom, period, X, T, errors, num_points, epsilon, random=True):
 class HybridOptimizer:
     def __init__(self, model, criterion, 
                  optim_adam=None, optim_lbfgs=None, 
-                 switch_epoch=None, switch_threshold=None,
+                 switch_epoch=2000, switch_threshold=1e-3,
                  early_stopping=None):
         self.model = model
         self.criterion = criterion
-        self.optim_adam = optim_adam
-        self.optim_lbfgs = optim_lbfgs
+
+        if optim_adam is None:
+            self.optim_adam = torch.optim.Adam(self.model.parameters(), lr=1e-3)
+        else:
+            self.optim_adam = optim_adam
+
+        if optim_lbfgs is None:
+            self.optim_lbfgs = torch.optim.LBFGS(self.model.parameters(), lr=1e-3)
+        else:
+            self.optim_lbfgs = optim_lbfgs
+
         self.switch_epoch = switch_epoch
         self.switch_threshold = switch_threshold
         self.current_optim = optim_adam if optim_lbfgs is None else optim_lbfgs
