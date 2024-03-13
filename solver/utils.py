@@ -14,7 +14,7 @@ class NetParams:
 
         self.epochs = None
         self.batch_size = None
-        self.learning_rate = None
+        self.lr = None
         self.activation = None
         self.training_mode = None
         self.optimizer = None
@@ -33,8 +33,8 @@ class NetParams:
 
     def set_params(self, input, output, hidden_layers, 
                    epochs, batch_size, 
-                   learning_rate, activation, training_mode, optimizer, 
-                   early_stopping, start_weights, use_rar, use_weights_adjuster,
+                   lr, activation, training_mode, optimizer, scheduler,
+                   early_stopping, use_rar, use_weights_adjuster,
                    display_interval, model_save_path, output_path, save_loss,
                    initial_weights_path, siren_params):
         """
@@ -44,10 +44,11 @@ class NetParams:
             hidden_layers: A list of integers representing the number of neurons in each hidden layer.
             epochs: The number of epochs for training.
             batch_size: The number of samples per batch.
-            learning_rate: The learning rate for the model.
+            lr: The learning rate for the model.
             activation: The activation function for the hidden layers.
             training_mode: The mode of training, e.g., 'train' or 'test'.
             optimizer: The optimizer for model training.
+            scheduler: The scheduler for model training.
             early_stopping: Boolean indicating whether to use early stopping.
             start_weights: Path to initial weights for the model.
             use_rar: Boolean indicating whether to use relative angular representations.
@@ -66,13 +67,13 @@ class NetParams:
 
         self.epochs = epochs
         self.batch_size = batch_size
-        self.learning_rate = learning_rate
+        self.lr = lr
         self.activation = activation
         self.training_mode = training_mode
         self.optimizer = optimizer
+        self.scheduler = scheduler
 
         self.early_stopping = early_stopping
-        self.start_weights = start_weights
         self.use_rar = use_rar
         self.use_weights_adjuster = use_weights_adjuster
 
@@ -102,8 +103,8 @@ class NetParams:
             activation=config_data["activation"],
             training_mode=config_data["training_mode"],
             optimizer=config_data["optimizer"],
+            scheduler=config_data["scheduler"],
             early_stopping=config_data["early_stopping"],
-            start_weights=config_data["start_weights"],
             use_rar=config_data["use_rar"],
             use_weights_adjuster=config_data["use_weights_adjuster"],
             display_interval=config_data["display_interval"],

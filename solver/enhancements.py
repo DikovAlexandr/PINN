@@ -62,8 +62,7 @@ def rar_points(geom, period, X, T, errors, num_points, epsilon, random=True):
 class HybridOptimizer:
     def __init__(self, model, criterion, 
                  optim_adam=None, optim_lbfgs=None, 
-                 switch_epoch=2000, switch_threshold=1e-3,
-                 early_stopping=None):
+                 switch_epoch=2000, switch_threshold=1e-3):
         self.model = model
         self.criterion = criterion
 
@@ -80,22 +79,27 @@ class HybridOptimizer:
         self.switch_epoch = switch_epoch
         self.switch_threshold = switch_threshold
         self.current_optim = optim_adam if optim_lbfgs is None else optim_lbfgs
-        self.early_stopping = early_stopping
         
         self.epoch_of_switch = None
 
-    def set_optimizer_adam(self):
+    def use_optimizer_adam(self):
         if self.optim_adam is not None:
             self.current_optim = self.optim_adam
         else:
             print("ADAM optimizer is not available. Current optimizer is L-BFGS")
 
-    def set_optimizer_lbfgs(self):
+    def set_optimizer_adam(self, optim_adam):
+        self.optim_adam = optim_adam
+
+    def use_optimizer_lbfgs(self):
         if self.optim_lbfgs is not None:
             self.current_optim = self.optim_lbfgs
         else:
             print("L-BFGS optimizer is not available. Current optimizer is ADAM")
 
+    def set_optimizer_lbfgs(self, optim_lbfgs):
+        self.optim_lbfgs = optim_lbfgs
+    
     def get_current_optimizer(self):
         return self.current_optim
 

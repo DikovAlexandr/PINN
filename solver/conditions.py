@@ -24,7 +24,7 @@ class Equation(MathConditions):
         self.t = t.flatten()
 
     def get_equation(self):
-        return self.x, self.t
+        return self.x.requires_grad_(True), self.t.requires_grad_(True)
 
 
 class InitialConditions(MathConditions):
@@ -39,7 +39,7 @@ class InitialConditions(MathConditions):
         self.initial_func = initial_func
     
     def get_initial_conditions(self):
-        return self.x, self.t, self.u
+        return self.x, self.t, self.u.unsqueeze(1)
 
 
 class BoundaryConditions(MathConditions):
@@ -59,7 +59,7 @@ class BoundaryConditions(MathConditions):
         self.boundary_func = boundary_func
 
     def get_boundary_conditions(self):
-        return self.x, self.t, self.u
+        return self.x, self.t, self.u.unsqueeze(1)
 
 
 class Test(MathConditions):

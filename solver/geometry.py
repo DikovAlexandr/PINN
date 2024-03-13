@@ -92,10 +92,10 @@ class Interval(Geometry1D):
         x_boundary_right = torch.ones(int(num_points/2), device=device) * self.x_right
         x_boundary_left = torch.ones(int(num_points/2), device=device) * self.x_left
         self.boundary_points = torch.cat([x_boundary_right, x_boundary_left])
-        return self.boundary_points.requires_grad_(True)
+        return self.boundary_points
     
     def get_boundary(self) -> torch.Tensor:
-        return self.boundary_points.requires_grad_(True)
+        return self.boundary_points
     
     def add_boundary(self, new_boundary_points) -> None:
         self.boundary_points = torch.cat([self.boundary_points, new_boundary_points])
@@ -108,10 +108,10 @@ class Interval(Geometry1D):
             self.inners_points = torch.linspace(self.x_left, self.x_right, 
                                                 num_points, device=device)
             self.spacing = (self.inners_points[1] - self.inners_points[0]).item()
-        return self.inners_points.requires_grad_(True)
+        return self.inners_points
     
     def get_inners(self) -> torch.Tensor:
-        return self.inners_points.requires_grad_(True)
+        return self.inners_points
     
     def add_inners(self, new_inners_points) -> None:
         self.inners_points = torch.cat([self.inners_points, new_inners_points])
@@ -203,10 +203,10 @@ class Rectangle(Geometry2D):
             self.spacing_boundaries = ((x_boundary[1] - x_boundary[0]).item(),
                                        (y_boundary[1] - y_boundary[0]).item())
             self.boundary_points = torch.cat((top, right, bottom, left))
-        return self.boundary_points.requires_grad_(True)
+        return self.boundary_points
     
     def get_boundary(self) -> torch.Tensor:
-        return self.boundary_points.requires_grad_(True)
+        return self.boundary_points
     
     def add_boundary(self, new_boundary_points) -> None:
         self.boundary_points = torch.cat((self.boundary_points, new_boundary_points))
@@ -233,10 +233,10 @@ class Rectangle(Geometry2D):
             self.spacing_inners = ((x_inners[1] - x_inners[0]).item(),
                                    (y_inners[1] - y_inners[0]).item())
             self.inners_points = torch.cat([X, Y], dim=1)
-        return self.inners_points.requires_grad_(True)
+        return self.inners_points
     
     def get_inners(self) -> torch.Tensor:
-        return self.inners_points.requires_grad_(True)
+        return self.inners_points
     
     def add_inners(self, new_inners_points) -> None:
         self.inners_points = torch.cat((self.inners_points, new_inners_points))
@@ -288,10 +288,10 @@ class Ellipse(Geometry2D):
             self.spacing_boundaries = ((x_boundary[1] - x_boundary[0]).item(),
                                        (y_boundary[1] - y_boundary[0]).item())
             self.boundary_points = torch.stack([x_boundary, y_boundary], dim=1)
-        return self.boundary_points.requires_grad_(True)
+        return self.boundary_points
     
     def get_boundary(self) -> torch.Tensor:
-        return self.boundary_points.requires_grad_(True)
+        return self.boundary_points
     
     def add_boundary(self, new_boundary_points) -> None:
         self.boundary_points = torch.cat((self.boundary_points, new_boundary_points))
@@ -320,10 +320,10 @@ class Ellipse(Geometry2D):
             self.spacing_inners = ((x_inners[1] - x_inners[0]).item(),
                                    (y_inners[1] - y_inners[0]).item())
             self.inners_points = points[mask.squeeze()]
-        return self.inners_points.requires_grad_(True)
+        return self.inners_points
     
     def get_inners(self) -> torch.Tensor:
-        return self.inners_points.requires_grad_(True)
+        return self.inners_points
     
     def add_inners(self, new_inners_points) -> None:
         self.inners_points = torch.cat([self.inners_points, new_inners_points])
