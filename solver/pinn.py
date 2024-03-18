@@ -22,7 +22,7 @@ def pde(dudt, d2udx2, alpha):
     Returns:
     torch.Tensor: the result of the PDE calculation
     """
-    return dudt - alpha**2 * d2udx2
+    return dudt - alpha * d2udx2
 
 
 class PINN():
@@ -70,7 +70,13 @@ class PINN():
         # Optimizer
         if net_params.optimizer == 'LBFGS':
             self.optimizer = torch.optim.LBFGS(self.net.parameters(), 
-                                               lr=net_params.lr)
+                                               lr=net_params.lr,
+                                               max_iter=10000,
+                                               max_eval=100000,
+                                               tolerance_grad = 1e-05,
+                                               tolerance_change = 1e-09,
+                                               history_size = 100,
+                                               line_search_fn = 'strong_wolfe')
             # From Navier-Stokes:
             # lr=1, max_iter=10000, max_eval=100000, history_size=100, tolerance_grad=1e-15, 
             # tolerance_change=0.5 * np.finfo(float).eps, line_search_fn="strong_wolfe")
@@ -83,10 +89,8 @@ class PINN():
                                               lr=net_params.lr)
         elif net_params.optimizer == 'Hybrid':
             self.optimizer = enhancements.HybridOptimizer(self.net.parameters(),
-                                                          self.criterion,
                                                           switch_epoch=1000,
-                                                          switch_threshold=1e-3,
-                                                          early_stopping=True)
+                                                          switch_threshold=10)
             self.optimizer.set_optimizer_adam(torch.optim.Adam(self.net.parameters()))
             self.optimizer.set_optimizer_lbfgs(torch.optim.LBFGS(self.net.parameters()))
             self.optimizer.use_optimizer_adam()
@@ -94,20 +98,23 @@ class PINN():
             raise ValueError(f"Unsupported optimizer: {net_params.optimizer}")    
 
         # Scheduler
-        schedulers = {
-            'StepLR': torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=1000, gamma=0.5),
-            'ExponentialLR': torch.optim.lr_scheduler.ExponentialLR(self.optimizer, gamma=0.9),
-            'ReduceLROnPlateau': torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', patience=10),
-            None: None
-        }
-        if net_params.scheduler in schedulers:
-            self.scheduler = schedulers[net_params.scheduler]
+        if net_params.optimizer == 'Hybrid':
+            self.scheduler = None
         else:
-            raise ValueError(f"Unsupported scheduler: {net_params.scheduler}")
+            schedulers = {
+                'StepLR': torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=1000, gamma=0.5),
+                'ExponentialLR': torch.optim.lr_scheduler.ExponentialLR(self.optimizer, gamma=0.9),
+                'ReduceLROnPlateau': torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', patience=10),
+                None: None
+            }
+            if net_params.scheduler in schedulers:
+                self.scheduler = schedulers[net_params.scheduler]
+            else:
+                raise ValueError(f"Unsupported scheduler: {net_params.scheduler}")
         
         # Early stopping
         if net_params.early_stopping:
-            self.early_stopping = enhancements.EarlyStopping()
+            self.early_stopping = enhancements.EarlyStopping(100)
         else:
             self.early_stopping = None
 
@@ -119,7 +126,7 @@ class PINN():
 
         # Weights adjustment
         if net_params.use_weights_adjuster:
-            self.adjuster = enhancements.LossWeightAdjuster(1e6, 1e-6, 1e-3, 10)
+            self.adjuster = enhancements.LossWeightAdjuster(1e6, 1, 1e-3, 10)
         else:
             self.adjuster = None
 
@@ -132,7 +139,8 @@ class PINN():
         # Save plots and loss history
         if net_params.output_path:
             self.output_path = net_params.output_path
-            utils.create_or_clear_folder(self.output_path)
+            # utils.create_or_clear_folder(self.output_path)
+            utils.create_folder(self.output_path)
         else:
             self.output_path = './output'
             utils.create_or_clear_folder(self.output_path)
@@ -145,7 +153,7 @@ class PINN():
 
         # Initial weights for fine tuning
         if net_params.initial_weights_path:
-            self.load_weights = net_params.initial_weights_path
+            self.load_weights(net_params.initial_weights_path)
 
         # Siren parameters
         if net_params.siren_params != None:
@@ -163,6 +171,25 @@ class PINN():
         self.weight_bc = 1000
         self.weight_ic = 1000
         self.null = torch.zeros((len(self.x_equation), 1), device=self.device)
+
+        # Model name
+        self.model_name = self.generate_name()
+
+    def generate_name(self):
+        base_name = f"HL_{len(self.hidden_layers)}_A_{self.activation}_N_{self.hidden_layers[-1]}"
+        
+        existing_models = os.listdir(self.output_path)
+        existing_numbers = [int(name.split('_')[-1].split('.')[0]) for name in existing_models if name.startswith(base_name) and name.split('_')[-1].split('.')[0].isdigit()]
+        
+        next_number = 0 if not existing_numbers else max(existing_numbers) + 1
+        print("Next number:", next_number)
+        model_name = f"{base_name}_{next_number}"
+        return model_name
+
+    def load_weights(self, file_path):
+        model_weights = torch.load(file_path)
+        self.net.load_state_dict(model_weights)
+        print("Model weights loaded from", file_path)
 
     def randomize_data(self, x, t, u=None):
         # Get the total number of examples
@@ -278,56 +305,95 @@ class PINN():
 
             # Initial loss
             u_prediction = self.function(self.x_initial, self.t_initial)
-            initial_loss = self.mse(u_prediction, self.u_initial)
+            self.initial_loss = self.mse(u_prediction, self.u_initial)
 
             # Boundary loss
             u_prediction = self.function(self.x_boundary, self.t_boundary)
-            boundary_loss = self.mse(u_prediction, self.u_boundary)
+            self.boundary_loss = self.mse(u_prediction, self.u_boundary)
 
             # Equation loss
             _, dudt, d2udx2 = self.function(self.x_equation, 
                                             self.t_equation, 
                                             is_equation=True)
             heat_eq_prediction = pde(dudt, d2udx2, self.alpha)
-            equation_loss = self.mse(heat_eq_prediction, self.null)
+            self.equation_loss = self.mse(heat_eq_prediction, self.null)
 
 
             # Total loss
-            self.loss = (self.weight_ic * initial_loss + 
-                        self.weight_bc * boundary_loss + 
-                        self.weight_eq * equation_loss)
+            self.loss = (self.weight_ic * self.initial_loss + 
+                         self.weight_bc * self.boundary_loss + 
+                         self.weight_eq * self.equation_loss)
 
             # Derivative with respect to weights
             self.loss.backward(retain_graph=True)
             self.iter += 1
 
+            # Print current loss
+            if self.iter % self.display_interval == 0:
+                exact_loss = self.initial_loss + self.boundary_loss + self.equation_loss
+                print(f'Iteration {self.iter}: Loss {exact_loss}')
+
+            if self.iter % self.display_interval == 0 and self.save_loss:
+                # Write to file
+                exact_loss = self.initial_loss + self.boundary_loss + self.equation_loss
+                with open(f'{self.output_path}/{self.model_name}.csv', 'a') as f:
+                    f.write(f"{self.iter}, {exact_loss}\n")
+
             return self.loss
 
     def train(self):
         self.net.train()
-        for epoch in range(self.epochs):
+        print(f"Oprtimizer: {self.optimizer.__class__.__name__}")
+
+        if isinstance(self.optimizer, torch.optim.LBFGS):
             self.optimizer.zero_grad()
-            self.loss = self.closure()
-            if isinstance(self.optimizer, torch.optim.LBFGS):
-                self.optimizer.step(self.closure)
-            else:
+            # self.loss = self.closure()
+            self.loss = self.optimizer.step(self.closure)
+            self.post_optimization_actions(self.iter)
+        elif isinstance(self.optimizer, torch.optim.Adam):
+            for epoch in range(self.epochs):
+                self.optimizer.zero_grad()
+                self.loss = self.closure()
                 self.optimizer.step()
+                self.post_optimization_actions(epoch)
+        else:
+            # Hybrid optimizer
+            local_epoch = 0
+            while isinstance(self.optimizer.get_current_optimizer(), torch.optim.Adam):
+                self.optimizer.zero_grad()
+                self.loss = self.closure()
+                self.optimizer.step(self.iter, self.closure)
+                self.post_optimization_actions(local_epoch)
+                local_epoch += 1
+            if isinstance(self.optimizer.get_current_optimizer(), torch.optim.LBFGS):
+                self.iter = local_epoch
+                self.optimizer.zero_grad()
+                self.loss = self.closure()
+                self.optimizer.step(self.iter, self.closure)
 
-            # Print current loss
-            if epoch % 100 == 0:
-                print(f'Epoch {self.iter+1}: Loss {self.loss.item()}')
+    def post_optimization_actions(self, epoch):
+        # Update scheduler
+        if self.scheduler is not None:
+            if isinstance(self.scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                self.scheduler.step(self.loss.item())
+            else:
+                self.scheduler.step()
 
-            # Weighs calibration
-            # if self.iter % 100 == 0 and self.adjuster is not None:
-            #     print("Adjusting weights...")
-            #     [self.weight_ic, self.weight_bc, self.weight_eq] = self.adjuster.adjust_weights([self.weight_ic, self.weight_bc, self.weight_eq], 
-            #                                                                                     [initial_loss, boundary_loss, equation_loss])
-            
-            # Save loss history
-            if self.iter % 100 == 0:
-                # Write to file
-                with open(f'{self.output_path}/HL_{len(self.hidden_layers)}_A_{self.activation}_N_{self.hidden_layers[-1]}.csv', 'a') as f:
-                    f.write(f"{self.iter}, {self.loss}\n")
+        # Weighs calibration
+        if epoch % 10 == 0 and self.adjuster is not None:
+            weights = [self.weight_ic, self.weight_bc, self.weight_eq]
+            # print(f"Current weights: {self.weight_ic}, {self.weight_bc}, {self.weight_eq}")
+            losses = [self.initial_loss.item(), 
+                    self.boundary_loss.item(), 
+                    self.equation_loss.item()]
+            self.weight_ic, self.weight_bc, self.weight_eq = self.adjuster.adjust_weights(weights, losses)
+            print(f"Adjusted weights: {self.weight_ic}, {self.weight_bc}, {self.weight_eq}")
+
+        # Early stopping
+        if self.early_stopping is not None:
+            self.early_stopping.step(self.loss.item())
+            if self.early_stopping.early_stop:
+                print("Early stopping triggered at epoch", epoch)
 
     def predict(self, x, t):
         self.net.eval()
@@ -339,6 +405,15 @@ class PINN():
     
     def get_loss_history(self):
         if self.save_loss:
-            return f'{self.output_path}/HL_{len(self.hidden_layers)}_A_{self.activation}_N_{self.hidden_layers[-1]}.csv'
+            return f'{self.output_path}/{self.model_name}.csv'
         else:
             return None
+        
+    def save_weights(self):
+        utils.create_folder(self.model_save_path)
+        # torch.save(self.net, f'{self.model_save_path}/model.pth')
+        model_weights = {}
+        for name, param in self.net.named_parameters():
+            model_weights[name] = param.data
+        torch.save(model_weights, f'{self.model_save_path}/{self.model_name}_weights.pth')
+        print("Model weights saved to", self.model_save_path)

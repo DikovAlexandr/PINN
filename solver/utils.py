@@ -38,7 +38,7 @@ class NetParams:
                    display_interval, model_save_path, output_path, save_loss,
                    initial_weights_path, siren_params):
         """
-        Args:
+        Parameters:
             input: The input dimension of the model.
             output: The output dimension of the model.
             hidden_layers: A list of integers representing the number of neurons in each hidden layer.
@@ -123,9 +123,6 @@ def create_or_clear_folder(folder_path):
 
     Parameters:
         folder_path (str): The path of the folder to delete or create.
-
-    Returns:
-        None
     """
     if os.path.exists(folder_path):
         for filename in os.listdir(folder_path):
@@ -142,6 +139,16 @@ def create_or_clear_folder(folder_path):
             except Exception as e:
                 print(f"Failed to delete {file_path}. Reason: {e}")
     else:
+        os.makedirs(folder_path)
+
+def create_folder(folder_path):
+    """
+	Create a folder at the specified path if it does not already exist.
+
+	Parameters:
+        folder_path (str): the path of the folder to be created
+	"""
+    if not os.path.exists(folder_path):
         os.makedirs(folder_path)
 
 def split_number(number):
@@ -165,7 +172,16 @@ def split_number(number):
 
 
 def to_numpy(tensor):
-        return tensor.cpu().detach().numpy()
+    """
+    Convert a PyTorch tensor to a NumPy array.
+
+    Parameters:
+        tensor (torch.Tensor): The input PyTorch tensor.
+
+    Returns:
+        numpy.ndarray: A NumPy array converted from the input tensor.
+    """
+    return tensor.cpu().detach().numpy()
 
 
 def comparison_plot(x, u_analytical, u_pinn, 
@@ -213,9 +229,6 @@ def loss_history_plot(data_path, output_folder, is_log=False, title='LossHistory
         output_folder (str): The folder where the plot will be saved.
         is_log (bool, optional): If True, plot the data using a logarithmic scale.
         title (str, optional): The title of the plot.
-
-    Returns:
-        None
     """
     if os.path.exists(data_path):
         loss_history = pd.read_csv(data_path, header=None)

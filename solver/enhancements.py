@@ -10,14 +10,14 @@ class LossWeightAdjuster:
         self.scaling_factor = scaling_factor
 
     def adjust_weights(self, weights, losses):
-        print(weights, losses)
-        for i in range(len(weights)):
-            if losses[i] < self.threshold:
-                weights[i] = weights[i] / self.scaling_factor
+        adjusted_weights = []
+        for weight, loss in zip(weights, losses):
+            if loss < self.threshold:
+                weight = max(weight / self.scaling_factor, self.min_weight)
             else:
-                weights[i] = losses[i] * self.scaling_factor
-            weights[i] = max(self.min_weight, min(weights[i], self.max_weight))
-        return weights
+                weight = min(weight * self.scaling_factor, self.max_weight)
+            adjusted_weights.append(weight)
+        return adjusted_weights
 
 # Collocation points resampling algorithm based on the RAR from the paper "DeepXDE"
 def rar_points(geom, period, X, T, errors, num_points, epsilon, random=True):
@@ -60,33 +60,18 @@ def rar_points(geom, period, X, T, errors, num_points, epsilon, random=True):
 # Class for hybrid optimization based on the paper
 # "The Old and the New: Can Physics-Informed Deep-Learning Replace Traditional Linear Solvers?"
 class HybridOptimizer:
-    def __init__(self, model, criterion, 
-                 optim_adam=None, optim_lbfgs=None, 
-                 switch_epoch=2000, switch_threshold=1e-3):
+    def __init__(self, model, switch_epoch=2000, switch_threshold=1e-3):
         self.model = model
-        self.criterion = criterion
-
-        if optim_adam is None:
-            self.optim_adam = torch.optim.Adam(self.model.parameters(), lr=1e-3)
-        else:
-            self.optim_adam = optim_adam
-
-        if optim_lbfgs is None:
-            self.optim_lbfgs = torch.optim.LBFGS(self.model.parameters(), lr=1e-3)
-        else:
-            self.optim_lbfgs = optim_lbfgs
-
-        self.switch_epoch = switch_epoch
+        self.switch_iter = switch_epoch
         self.switch_threshold = switch_threshold
-        self.current_optim = optim_adam if optim_lbfgs is None else optim_lbfgs
-        
+        self.current_optim = None
         self.epoch_of_switch = None
 
     def use_optimizer_adam(self):
         if self.optim_adam is not None:
             self.current_optim = self.optim_adam
         else:
-            print("ADAM optimizer is not available. Current optimizer is L-BFGS")
+            print("Adam optimizer is not available. Current optimizer is L-BFGS")
 
     def set_optimizer_adam(self, optim_adam):
         self.optim_adam = optim_adam
@@ -109,41 +94,28 @@ class HybridOptimizer:
     def get_switch_info(self):
         return {'epoch_of_switch': self.epoch_of_switch, '\n'
                 'switch_loss_threshold': self.switch_threshold}
-
-    def closure(self):
+    
+    def zero_grad(self):
         self.current_optim.zero_grad()
-        predictions = self.model(self.X)
-        loss = self.criterion(predictions, self.y)
-        loss.backward()
-        return loss
 
-    def step(self, epoch, X, y):
-        # Update trining data
-        self.X = X
-        self.y = y
-
-        # Reset gradients
-        self.current_optim.zero_grad()
-        
-        if epoch >= self.switch_epoch and self.current_optim == self.optim_adam:
+    def step(self, iter, closure):        
+        if iter >= self.switch_iter and isinstance(self.current_optim, torch.optim.Adam):
             # Switch to L-BFGS if conditions are met
-            loss = self.criterion(self.model(self.X), self.y)
+            loss = closure()
             if loss.item() < self.switch_threshold:
-                print(f'Switching to L-BFGS at epoch {epoch + 1} with loss {loss.item()}')
-                self.epoch_of_switch = epoch
-                self.current_optim = self.optim_lbfgs
+                print(f'Switching to L-BFGS at intation {iter + 1} with loss {loss.item()}')
+                self.epoch_of_switch = iter    
+                self.use_optimizer_lbfgs()
 
         # Perform optimization step with the current optimizer
-        self.current_optim.step(self.closure)
-
-        # Check early stopping condition
-        if self.early_stopping is not None:
-            current_loss = self.criterion(self.model(self.X), self.y).item()
-            if self.early_stopping(current_loss):
-                print(f'Early stopping at epoch {epoch + 1} with loss {current_loss}')
+        if isinstance(self.current_optim, torch.optim.LBFGS):
+            self.current_optim.step(closure)
+        else:
+            closure()
+            self.current_optim.step()
 
 class EarlyStopping:
-    def __init__(self, patience=5):
+    def __init__(self, patience=10):
         self.patience = patience
         self.counter = 0
         self.best_loss = float('inf')
@@ -157,22 +129,3 @@ class EarlyStopping:
             self.counter += 1
             if self.counter >= self.patience:
                 self.early_stop = True
-
-# class EarlyStopping:
-#     def __init__(self, patience=100, min_delta=0.0001):
-#         self.patience = patience
-#         self.min_delta = min_delta
-#         self.counter = 0
-#         self.best_loss = None
-#         self.early_stop = False
-
-#     def __call__(self, current_loss):
-#         if self.best_loss is None:
-#             self.best_loss = current_loss
-#         elif current_loss > self.best_loss - self.min_delta:
-#             self.counter += 1
-#             if self.counter >= self.patience:
-#                 self.early_stop = True
-#         else:
-#             self.best_loss = current_loss
-#             self.counter = 0
