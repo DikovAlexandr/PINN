@@ -22,7 +22,7 @@ def pde(dudt, d2udx2, alpha):
     Returns:
     torch.Tensor: the result of the PDE calculation
     """
-    return dudt - alpha * d2udx2
+    return dudt - alpha**2 * d2udx2
 
 
 class PINN():
@@ -63,6 +63,12 @@ class PINN():
         else:
             raise ValueError(f"Unsupported activation function: {net_params.activation}")
         
+        # Siren parameters
+        if net_params.siren_params != None:
+            self.first_omega_0 = net_params.siren_params.first_omega_0
+            self.hidden_omega_0 = net_params.siren_params.hidden_omega_0
+            self.outermost_linear = net_params.siren_params.outermost_linear
+
         # Initialize network
         self.network()
         self.print_network()
@@ -155,12 +161,6 @@ class PINN():
         if net_params.initial_weights_path:
             self.load_weights(net_params.initial_weights_path)
 
-        # Siren parameters
-        if net_params.siren_params != None:
-            self.first_omega_0 = net_params.siren_params.first_omega_0
-            self.hidden_omega_0 = net_params.siren_params.hidden_omega_0
-            self.outermost_linear = net_params.siren_params.outermost_linear
-
         # Iteration number
         self.iter = 0
 
@@ -168,7 +168,7 @@ class PINN():
         self.loss = 0
         self.mse = torch.nn.MSELoss()
         self.weight_eq = 1000
-        self.weight_bc = 1000
+        self.weight_bc = 10000
         self.weight_ic = 1000
         self.null = torch.zeros((len(self.x_equation), 1), device=self.device)
 
@@ -223,7 +223,7 @@ class PINN():
             return sorted_x, sorted_t, sorted_u
         
     def network(self):
-        if self.activation is siren.Sin(): # SIREN
+        if isinstance(self.activation, siren.Sin): # SIREN
             # First linear layer
             layers = [siren.SineLayer(self.input, self.hidden_layers[0], 
                                       is_first=True, omega_0=self.first_omega_0)]
@@ -356,6 +356,13 @@ class PINN():
                 self.loss = self.closure()
                 self.optimizer.step()
                 self.post_optimization_actions(epoch)
+
+                # Early stopping
+                if self.early_stopping is not None:
+                    self.early_stopping.step(self.loss.item())
+                    if self.early_stopping.early_stop:
+                        print("Early stopping triggered at epoch", epoch)
+                        break
         else:
             # Hybrid optimizer
             local_epoch = 0
@@ -365,6 +372,14 @@ class PINN():
                 self.optimizer.step(self.iter, self.closure)
                 self.post_optimization_actions(local_epoch)
                 local_epoch += 1
+
+                # Early stopping
+                if self.early_stopping is not None:
+                    self.early_stopping.step(self.loss.item())
+                    if self.early_stopping.early_stop:
+                        print("Early stopping triggered at epoch", local_epoch)
+                        break
+
             if isinstance(self.optimizer.get_current_optimizer(), torch.optim.LBFGS):
                 self.iter = local_epoch
                 self.optimizer.zero_grad()
@@ -388,12 +403,6 @@ class PINN():
                     self.equation_loss.item()]
             self.weight_ic, self.weight_bc, self.weight_eq = self.adjuster.adjust_weights(weights, losses)
             print(f"Adjusted weights: {self.weight_ic}, {self.weight_bc}, {self.weight_eq}")
-
-        # Early stopping
-        if self.early_stopping is not None:
-            self.early_stopping.step(self.loss.item())
-            if self.early_stopping.early_stop:
-                print("Early stopping triggered at epoch", epoch)
 
     def predict(self, x, t):
         self.net.eval()

@@ -115,7 +115,7 @@ class HybridOptimizer:
             self.current_optim.step()
 
 class EarlyStopping:
-    def __init__(self, patience=10):
+    def __init__(self, patience=50):
         self.patience = patience
         self.counter = 0
         self.best_loss = float('inf')

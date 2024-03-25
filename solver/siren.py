@@ -35,3 +35,6 @@ class SineLayer(torch.nn.Module):
 class Sin():
     def __init__(self):
         pass
+
+    def __repr__(self):
+        return 'Sin()'
