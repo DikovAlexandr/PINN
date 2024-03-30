@@ -4,6 +4,8 @@ from matplotlib import cm
 import numpy as np
 import torch
 
+import solver.metrics as metrics
+
 def solution_gif(solution, frames, output_path='plots/animation.gif'):
     """
 	Generates an animated GIF of the solution evolution over time.
@@ -69,6 +71,8 @@ def conditions_plot(problem, t, output_path=None):
     x_ic, _, u_ic = problem.initial_conditions.get_initial_conditions()
     x_bc, t_bc, u_bc = problem.boundary_conditions.get_boundary_conditions()
     time_index = find_index(problem, t_bc, t)
+
+    plt.figure(figsize=(8, 8))
 
     if x_ic.dim() == 1:
         # 1D problem
@@ -148,6 +152,35 @@ def solution_surface_plot(problem, solution, output_path=None):
     ax.set_ylabel('t')
     ax.set_zlabel('u')
     ax.legend()
+
+    # Save the figure or display it
+    if output_path:
+        plt.savefig(output_path)
+    else:
+        plt.show()
+
+
+def plot_error(solution, y_true, output_path=None):
+    x_solver, _, u_solver = solution.get_solution()
+    error = metrics.calculate_error(y_true, u_solver, is_abs=False)
+    
+    plt.figure(figsize=(8, 8))
+
+    if x_solver.dim() == 1:
+        # 1D problem
+        plt.plot(to_numpy(x_solver), to_numpy(error), label='Error')
+        plt.xlabel('x')
+        plt.ylabel('Error')
+        
+    elif x_solver.dim() == 2:
+        # 2D problem
+        plt.scatter(to_numpy(x_solver[:, 0]), to_numpy(x_solver[:, 1]), to_numpy(error), 
+                    cmap='viridis', cbar=True)
+        plt.xlabel('x')
+        plt.ylabel('y')
+
+    plt.title('Error Plot')
+    plt.legend()
 
     # Save the figure or display it
     if output_path:

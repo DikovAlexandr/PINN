@@ -73,6 +73,10 @@ class PINN():
         self.network()
         self.print_network()
 
+        # Regularization
+        self.regularization = net_params.regularization
+        self.lambda_reg = net_params.lambda_reg
+
         # Optimizer
         if net_params.optimizer == 'LBFGS':
             self.optimizer = torch.optim.LBFGS(self.net.parameters(), 
@@ -323,6 +327,14 @@ class PINN():
             self.loss = (self.weight_ic * self.initial_loss + 
                          self.weight_bc * self.boundary_loss + 
                          self.weight_eq * self.equation_loss)
+            
+            # Lasso, Ridge or Elastic regularization
+            if self.regularization == "Lasso":
+                self.loss += self.lasso(self.lambda_reg)
+            elif self.regularization == "Ridge":
+                self.loss += self.ridge(self.lambda_reg)
+            elif self.regularization == "Elastic":
+                self.loss += self.elastic(self.lambda_reg, self.l1_ratio)
 
             # Derivative with respect to weights
             self.loss.backward(retain_graph=True)
@@ -340,6 +352,26 @@ class PINN():
                     f.write(f"{self.iter}, {exact_loss}\n")
 
             return self.loss
+        
+    def lasso(self, lambda_reg):
+        l1_reg = torch.tensor(0., requires_grad=True)
+        for param in self.parameters():
+            l1_reg += torch.norm(param, p=1)
+        return lambda_reg * l1_reg
+
+    def ridge(self, lambda_reg):
+        l2_reg = torch.tensor(0., requires_grad=True)
+        for param in self.parameters():
+            l2_reg += torch.norm(param)
+        return lambda_reg * l2_reg
+    
+    def elastic(self, lambda_reg, l1_ratio):
+        l1_reg = torch.tensor(0., requires_grad=True)
+        l2_reg = torch.tensor(0., requires_grad=True)
+        for param in self.parameters():
+            l1_reg += torch.norm(param, p=1)
+            l2_reg += torch.norm(param)
+        return lambda_reg * l1_ratio * l1_reg + lambda_reg * (1 - l1_ratio) * l2_reg
 
     def train(self):
         self.net.train()

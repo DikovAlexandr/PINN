@@ -31,9 +31,11 @@ class NetParams:
 
         self.siren_params = None
 
-    def set_params(self, input, output, hidden_layers, 
-                   epochs, batch_size, 
-                   lr, activation, training_mode, optimizer, scheduler,
+    def set_params(self, input, output, hidden_layers,
+                   epochs, batch_size,
+                   lr, activation, training_mode,
+                   regularization, lambda_reg,
+                   optimizer, scheduler,
                    early_stopping, use_rar, use_weights_adjuster,
                    display_interval, model_save_path, output_path, save_loss,
                    initial_weights_path, siren_params):
@@ -47,6 +49,8 @@ class NetParams:
             lr: The learning rate for the model.
             activation: The activation function for the hidden layers.
             training_mode: The mode of training, e.g., 'train' or 'test'.
+            regularization: The type of regularization to use.
+            lambda_reg: The coefficient of the regularization.
             optimizer: The optimizer for model training.
             scheduler: The scheduler for model training.
             early_stopping: Boolean indicating whether to use early stopping.
@@ -70,6 +74,10 @@ class NetParams:
         self.lr = lr
         self.activation = activation
         self.training_mode = training_mode
+
+        self.regularization = regularization
+        self.lambda_reg = lambda_reg
+
         self.optimizer = optimizer
         self.scheduler = scheduler
 
@@ -102,6 +110,8 @@ class NetParams:
             learning_rate=config_data["learning_rate"],
             activation=config_data["activation"],
             training_mode=config_data["training_mode"],
+            regularization=config_data["regularization"],
+            lambda_reg=config_data["lambda_reg"],
             optimizer=config_data["optimizer"],
             scheduler=config_data["scheduler"],
             early_stopping=config_data["early_stopping"],
