@@ -1,9 +1,12 @@
 import os
 import json
+import torch
 import shutil
 import numpy as np
 import pandas as pd
+from typing import List
 import matplotlib.pyplot as plt
+
 
 
 class NetParams:
@@ -31,28 +34,28 @@ class NetParams:
 
         self.siren_params = None
 
-    def set_params(self, input, output, hidden_layers,
-                   epochs, batch_size,
-                   lr, activation, training_mode,
-                   regularization, lambda_reg,
+    def set_params(self, input: int, output: int, hidden_layers: List[int],
+                   epochs: int, batch_size: int,
+                   lr: float, activation: str, training_mode: str,
+                   regularization: str, lambda_reg: float,
                    optimizer, scheduler,
                    early_stopping, use_rar, use_weights_adjuster,
                    display_interval, model_save_path, output_path, save_loss,
                    initial_weights_path, siren_params):
         """
         Parameters:
-            input: The input dimension of the model.
-            output: The output dimension of the model.
-            hidden_layers: A list of integers representing the number of neurons in each hidden layer.
+            input (int): The input dimension of the model.
+            output (int): The output dimension of the model.
+            hidden_layers (list): A list of integers representing the number of neurons in each hidden layer.
             epochs: The number of epochs for training.
             batch_size: The number of samples per batch.
             lr: The learning rate for the model.
             activation: The activation function for the hidden layers.
             training_mode: The mode of training, e.g., 'train' or 'test'.
-            regularization: The type of regularization to use.
+            regularization: The type of regularization to use. Might be 'Lasso', 'Ridge' or 'Elastic'.
             lambda_reg: The coefficient of the regularization.
-            optimizer: The optimizer for model training.
-            scheduler: The scheduler for model training.
+            optimizer: The optimizer for model training. Might be 'LBFGS', 'Adam' or 'Hybrid'.
+            scheduler: The scheduler for model training. Might be 'StepLR', 'ExponentialLR', 'ReduceLROnPlateau'.
             early_stopping: Boolean indicating whether to use early stopping.
             start_weights: Path to initial weights for the model.
             use_rar: Boolean indicating whether to use relative angular representations.
@@ -126,7 +129,7 @@ class NetParams:
         )
 
 
-def create_or_clear_folder(folder_path):
+def create_or_clear_folder(folder_path: str):
     """
     Deletes all files and subdirectories in the specified folder path if it exists, 
     excluding .md files. If the folder does not exist, creates a new folder at the specified path.
@@ -151,7 +154,7 @@ def create_or_clear_folder(folder_path):
     else:
         os.makedirs(folder_path)
 
-def create_folder(folder_path):
+def create_folder(folder_path: str):
     """
 	Create a folder at the specified path if it does not already exist.
 
@@ -181,7 +184,7 @@ def split_number(number):
     return part1, part2, part3, part4
 
 
-def to_numpy(tensor):
+def to_numpy(tensor: torch.Tensor) -> np.ndarray:
     """
     Convert a PyTorch tensor to a NumPy array.
 
@@ -192,63 +195,3 @@ def to_numpy(tensor):
         numpy.ndarray: A NumPy array converted from the input tensor.
     """
     return tensor.cpu().detach().numpy()
-
-
-def comparison_plot(x, u_analytical, u_pinn, 
-                    output_folder, title='Comparison'):
-    """
-    Plots the comparison of analytical and PINN solutions.
-
-    Parameters:
-        x (torch.Tensor): X data for the plot
-        u_analytical (torch.Tensor): Analytical solution data
-        u_pinn (torch.Tensor): PINN solution data
-        output_folder (str): Path to the output folder
-        title (str, optional): Title of the plot. Defaults to 'Comparison'.
-
-    Returns:
-        None
-    """
-    plt.figure(figsize=(10, 10))
-    if len(x.shape) == 1:
-        plt.plot(to_numpy(x), to_numpy(u_analytical), label="Analytical")
-        plt.plot(to_numpy(x), to_numpy(u_pinn), label="PINN")
-        plt.xlabel('x')
-    else:
-        # TODO: make more comparable plot
-        plt.scatter(to_numpy(x[:, 0]), to_numpy(x[:, 1]), c=u_analytical, 
-                    marker='o', label="Analytical", cmap='viridis')
-        plt.scatter(to_numpy(x[:, 0]), to_numpy(x[:, 1]), c=u_pinn, 
-                    marker='x', label="PINN", cmap='viridis')
-        plt.colorbar(label='u')
-    plt.ylabel('u')
-    plt.legend()
-    plt.title(title)
-    if output_folder:
-        plt.savefig(os.path.join(output_folder, title + '.png'))
-        plt.show()
-    else:
-        plt.show()
-
-def loss_history_plot(data_path, output_folder, is_log=False, title='LossHistory'):
-    """
-    Generate a plot of loss history from the data.
-
-    Parameters:
-        data_path (str): The path to the CSV file containing the loss history data.
-        output_folder (str): The folder where the plot will be saved.
-        is_log (bool, optional): If True, plot the data using a logarithmic scale.
-        title (str, optional): The title of the plot.
-    """
-    if os.path.exists(data_path):
-        loss_history = pd.read_csv(data_path, header=None)
-        if is_log:
-            plt.semilogy(loss_history[0], loss_history[1])
-            plt.ylabel('Logarithmic Loss')
-        else:
-            plt.plot(loss_history[0], loss_history[1])
-            plt.ylabel('Loss')
-        plt.xlabel('Epoch')
-        plt.title(title)
-        plt.savefig(os.path.join(output_folder, title + '.png'))
-        plt.show()

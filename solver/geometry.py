@@ -1,74 +1,90 @@
+from abc import ABC, abstractmethod
 import numpy as np
 import torch
-from typing import Tuple
+from typing import Tuple, Union, List
 
 from .utils import split_number
 
-class Geometry1D:
+
+class Geometry(ABC):
+    @abstractmethod
+    def inside(self) -> bool:
+        raise NotImplementedError
+    
+    @abstractmethod
+    def boundary(self) -> torch.Tensor:
+        raise NotImplementedError
+    
+    @abstractmethod
+    def get_boundary(self) -> torch.Tensor:
+        raise NotImplementedError
+
+    @abstractmethod       
+    def add_boundary(self) -> None:
+        raise NotImplementedError
+    
+    @abstractmethod
+    def inners(self) -> torch.Tensor:
+        raise NotImplementedError
+
+    @abstractmethod   
+    def get_inners(self) -> torch.Tensor:
+        raise NotImplementedError
+    
+    @abstractmethod
+    def add_inners(self, new_inners_points) -> None:
+        raise NotImplementedError
+    
+    @abstractmethod
+    def get_dimension(self) -> int:
+        raise NotImplementedError
+
+
+class Geometry1D(Geometry):
+    @abstractmethod
     def length(self) -> float:
         pass
     
+    @abstractmethod
     def limits(self) -> Tuple[float, float]:
         pass
-
-    def inside(self, x) -> bool:
-        pass
-
-    def boundary(self, num_points, 
-                 device="cuda:0", random=False) -> torch.Tensor:
-        pass
-
-    def get_boundary(self) -> torch.Tensor:
-        pass
-
-    def add_boundary(self, new_boundary_points) -> None:
-        pass
-
-    def inners(self, num_points, 
-               device="cuda:0", random=False) -> torch.Tensor:
-        pass
-
-    def get_inners(self) -> torch.Tensor:
-        pass
-
-    def add_inners(self, new_inners_points) -> None:
-        pass
-
+    
+    @abstractmethod
     def grid_spacing(self) -> float:
         pass
 
-class Geometry2D:
-    def inside(self, x) -> bool:
-        pass
+    def get_dimension(self) -> int:
+        return 1
 
+
+class Geometry2D(Geometry):
+    @abstractmethod
+    def inside(self) -> bool:
+        pass
+    
+    @abstractmethod
     def limits(self) -> Tuple[Tuple[float, float], Tuple[float, float]]:
         pass
-
-    def boundary(self, num_points, 
-                 device="cuda:0", random=False) -> torch.Tensor:
+    
+    @abstractmethod
+    def grid_spacing_boundary(self) -> float:
         pass
 
-    def get_boundary(self) -> torch.Tensor:
+    @abstractmethod
+    def grid_spacing_inners(self) -> float:
         pass
 
-    def add_boundary(self, new_boundary_points) -> None:
-        pass
+    def get_dimension(self) -> int:
+        return 2
 
-    def inners(self, num_points, 
-               device="cuda:0", random=False) -> torch.Tensor:
-        pass
-
-    def get_inners(self) -> torch.Tensor:
-        pass
-
-    def add_inners(self, new_inners_points) -> None:
-        pass
-
-    def grid_spacing(self) -> float:
-        pass
 
 class Interval(Geometry1D):
     def __init__(self, x_left, x_right):
+        """
+        Parameters:
+            x_left (float): Left boundary.
+            x_right (float): Right boundary.
+        """
         self.x_left = x_left
         self.x_right = x_right
         self.spacing = None
@@ -80,30 +96,63 @@ class Interval(Geometry1D):
         return f"Interval({self.x_left}, {self.x_right})"
     
     def length(self) -> float:
+        """
+        Returns the length of the interval.
+        """
         return self.x_right - self.x_left
     
     def limits(self) -> Tuple[float, float]:
+        """
+        Returns the limits of the interval as a tuple.
+        """
         return (self.x_left, self.x_right)
     
-    def inside(self, x) -> bool:
+    def inside(self, x: float) -> bool:
+        """
+        Returns True if the point is inside the interval.
+        """
         return (x >= self.x_left) & (x <= self.x_right)
 
-    def boundary(self, num_points, device="cuda:0", random=False) -> torch.Tensor:
+    def boundary(self, num_points: int, 
+                 device="cuda:0", random=False) -> torch.Tensor:
+        """
+        Set the boundary points.
+
+        Parameters:
+            num_points (int): Number of points to set.
+            device (str, optional): Device on which to set the points. Defaults to "cuda:0".
+            random (bool, optional): If True, set the points randomly. Defaults to False.
+        """
         x_boundary_right = torch.ones(int(num_points/2), device=device) * self.x_right
         x_boundary_left = torch.ones(int(num_points/2), device=device) * self.x_left
         self.boundary_points = torch.cat([x_boundary_right, x_boundary_left])
         return self.boundary_points
     
     def get_boundary(self) -> torch.Tensor:
+        """
+        Returns the boundary points.
+        """
         return self.boundary_points
     
-    def add_boundary(self, new_boundary_points) -> None:
+    def add_boundary(self, new_boundary_points: torch.Tensor) -> None:
+        """
+        Adds new boundary points.
+        """
         self.boundary_points = torch.cat([self.boundary_points, new_boundary_points])
     
-    def inners(self, num_points, device="cuda:0", random=False) -> torch.Tensor:
+    def inners(self, num_points: int, 
+               device="cuda:0", random=False) -> torch.Tensor:
+        """
+        Set the inner points.
+
+        Parameters: 
+            num_points (int): Number of points to set.
+            device (str, optional): Device on which to set the points. Defaults to "cuda:0".
+            random (bool, optional): If True, set the points randomly. Defaults to False.
+        """
         if random:
             self.inners_points = (torch.rand(num_points, device=device) * 
-                        (self.x_right - self.x_left) + self.x_left)
+                                  (self.x_right - self.x_left) + self.x_left)
         else:
             self.inners_points = torch.linspace(self.x_left, self.x_right, 
                                                 num_points, device=device)
@@ -111,17 +160,35 @@ class Interval(Geometry1D):
         return self.inners_points
     
     def get_inners(self) -> torch.Tensor:
+        """
+        Returns the inner points.
+        """                
         return self.inners_points
     
-    def add_inners(self, new_inners_points) -> None:
+    def add_inners(self, new_inners_points: torch.Tensor) -> None:
+        """
+        Adds new inner points.
+        """
         self.inners_points = torch.cat([self.inners_points, new_inners_points])
     
-    def grid_spacing_inners(self) -> float:
+    def grid_spacing(self) -> float:
+        """
+        Returns the grid spacing.
+        """                
         return self.spacing
 
 
 class Rectangle(Geometry2D):
-    def __init__(self, x_min, x_max, y_min, y_max):
+    def __init__(self, 
+                 x_min, x_max,
+                 y_min, y_max):
+        """
+        Parameters:
+            x_min (float): Left boundary x coordinate.
+            x_max (float): Right boundary x coordinate.
+            y_min (float): Bottom boundary y coordinate.
+            y_max (float): Top boundary y coordinate.
+        """
         self.x_min = x_min
         self.x_max = x_max
         self.y_min = y_min
@@ -137,20 +204,39 @@ class Rectangle(Geometry2D):
         return (f"Rectangle({self.x_min}, {self.x_max}, "
                 f"{self.y_min}, {self.y_max})")
     
-    def size (self) -> Tuple[float, float]:
+    def size(self) -> Tuple[float, float]:
+        """
+        Returns the size of the rectangle as a tuple.
+        """
         return (self.x_max - self.x_min, self.y_max - self.y_min)
     
     def limits(self) -> Tuple[Tuple[float, float], Tuple[float, float]]:
+        """
+        Returns the limits of the rectangle as a tuple in the form (left, right) and (bottom, top).
+        """ 
         return ((self.x_min, self.x_max), (self.y_min, self.y_max))
 
-    def inside(self, x) -> bool:
+    def inside(self, x: Union[np.ndarray, List[float], Tuple[float, ...]]) -> bool:
+        """
+        Returns True if the point is inside the rectangle.
+        """
         x = np.asarray(x)
         return ((x[0] >= self.x_min) & (x[0] <= self.x_max) & 
                 (x[1] >= self.y_min) & (x[1] <= self.y_max))
 
-    def boundary(self, num_points, device="cuda:0", random=False) -> torch.Tensor:
+    def boundary(self, num_points: int, 
+                 device="cuda:0", random=False) -> torch.Tensor:
+        """
+        Set the boundary points.
+
+        Parameters:
+            num_points (int): Number of points to set.
+            device (str, optional): Device on which to set the points. Defaults to "cuda:0".
+            random (bool, optional): If True, set the points randomly. Defaults to False.
+        """
         if random:
             top_boundary, bottom_boundary, left_boundary, right_boundary = split_number(num_points)
+            
             # Top
             x_boundary = (torch.rand(top_boundary, device=device) * 
                             (self.x_max - self.x_min) + self.x_min)
@@ -202,16 +288,33 @@ class Rectangle(Geometry2D):
             # Calculate spacing
             self.spacing_boundaries = ((x_boundary[1] - x_boundary[0]).item(),
                                        (y_boundary[1] - y_boundary[0]).item())
+            
+            # Concatenate
             self.boundary_points = torch.cat((top, right, bottom, left))
         return self.boundary_points
     
     def get_boundary(self) -> torch.Tensor:
+        """
+        Returns the boundary points.
+        """
         return self.boundary_points
     
-    def add_boundary(self, new_boundary_points) -> None:
+    def add_boundary(self, new_boundary_points: torch.Tensor) -> None:
+        """
+        Adds new boundary points to the boundary.
+        """
         self.boundary_points = torch.cat((self.boundary_points, new_boundary_points))
     
-    def inners(self, num_points, device="cuda:0", random=False) -> torch.Tensor:
+    def inners(self, num_points: int, 
+               device="cuda:0", random=False) -> torch.Tensor:
+        """
+        Set the inner points.
+
+        Parameters:
+            num_points (int): Number of points to set.
+            device (str, optional): Device on which to set the points. Defaults to "cuda:0".
+            random (bool, optional): If True, set the points randomly. Defaults to False.
+        """
         if random:
             x_inners = (torch.rand(num_points, device=device) * 
                         (self.x_max - self.x_min) + self.x_min)
@@ -236,19 +339,39 @@ class Rectangle(Geometry2D):
         return self.inners_points
     
     def get_inners(self) -> torch.Tensor:
+        """
+        Returns the inner points.
+        """
         return self.inners_points
     
-    def add_inners(self, new_inners_points) -> None:
+    def add_inners(self, new_inners_points: torch.Tensor) -> None:
+        """
+        Adds new inner points to the inner points.
+        """
         self.inners_points = torch.cat((self.inners_points, new_inners_points))
         
     def grid_spacing_boundary(self) -> Tuple[float, float]:
+        """
+        Returns the spacing of the boundary points.
+        """
         return self.spacing_boundaries
     
     def grid_spacing_inners(self) -> Tuple[float, float]:
+        """
+        Returns the spacing of the inner points.
+        """
         return self.spacing_inners
+
 
 class Ellipse(Geometry2D):
     def __init__(self, x_center, y_center, x_radius, y_radius):
+        """
+        Parameters:
+            x_center (float): x coordinate of the ellipses center point.
+            y_center (float): y coordinate of the ellipses center point.
+            x_radius (float): Semi-major axis of the ellipse (along the x-axis).
+            y_radius (float): Semi-minor axis of the ellipse (along the y-axis).
+        """
         self.x_center = x_center
         self.y_center = y_center
         self.x_radius = x_radius
@@ -264,15 +387,30 @@ class Ellipse(Geometry2D):
                 f"x_radius={self.x_radius}, y_radius={self.y_radius})")
     
     def limits(self) -> Tuple[Tuple[float]]:
+        """
+        Returns the limits of the ellipse in the form (x_min, x_max, y_min, y_max).
+        """
         return ((self.x_center - self.x_radius, self.x_center + self.x_radius),
                 (self.y_center - self.y_radius, self.y_center + self.y_radius))
 
-    def inside(self, x) -> bool:
+    def inside(self, x: Union[np.ndarray, List[float], Tuple[float, ...]]) -> bool:
+        """
+        Returns True if x is inside the ellipse.
+        """
         x = np.asarray(x)
         return (((x[0] - self.x_center) / self.x_radius) ** 2 + 
                 ((x[1] - self.y_center) / self.y_radius) ** 2 <= 1)
 
-    def boundary(self, num_points, device="cuda:0", random=False) -> torch.Tensor:
+    def boundary(self, num_points: int, 
+                 device="cuda:0", random=False) -> torch.Tensor:
+        """
+        Set the boundary points.
+
+        Parameters:
+            num_points (int): Number of points to set.
+            device (str, optional): Device on which to set the points. Defaults to "cuda:0".
+            random (bool, optional): If True, set the points randomly. Defaults to False.
+        """
         if random:
             theta = torch.rand(num_points, device=device) * 2 * np.pi
             x_boundary = self.x_center + self.x_radius * torch.cos(theta)
@@ -291,12 +429,27 @@ class Ellipse(Geometry2D):
         return self.boundary_points
     
     def get_boundary(self) -> torch.Tensor:
+        """
+        Returns the boundary points.
+        """
         return self.boundary_points
     
     def add_boundary(self, new_boundary_points) -> None:
+        """
+        Adds new boundary points to the boundary points.
+        """     
         self.boundary_points = torch.cat((self.boundary_points, new_boundary_points))
         
-    def inners(self, num_points, device="cuda:0", random=False) -> torch.Tensor:
+    def inners(self, num_points: int, 
+               device="cuda:0", random=False) -> torch.Tensor:
+        """
+        Set the inner points.
+
+        Parameters:
+            num_points (int): Number of points to set.
+            device (str, optional): Device on which to set the points. Defaults to "cuda:0".
+            random (bool, optional): If True, set the points randomly. Defaults to False.
+        """
         if random:
             theta = torch.rand(num_points, device=device) * 2 * np.pi
             r = torch.sqrt(torch.rand(num_points, device=device)) * self.x_radius
@@ -323,17 +476,36 @@ class Ellipse(Geometry2D):
         return self.inners_points
     
     def get_inners(self) -> torch.Tensor:
+        """
+        Returns the inner points.
+        """
         return self.inners_points
     
     def add_inners(self, new_inners_points) -> None:
+        """
+        Adds new inner points to the inner points.
+        """
         self.inners_points = torch.cat([self.inners_points, new_inners_points])
         
     def grid_spacing_boundary(self):
+        """
+        Returns the spacing of the boundary points.
+        """
         return self.spacing_boundaries
     
     def grid_spacing_inners(self):
+        """
+        Returns the spacing of the inner points.
+        """
         return self.spacing_inners
+
 
 class Circle(Ellipse):
     def __init__(self, x_center, y_center, radius):
+        """
+        Parameters:
+            x_center (float): x-coordinate of the center.
+            y_center (float): y-coordinate of the center.
+            radius (float): radius of the circle.
+        """
         super().__init__(x_center, y_center, radius, radius)

@@ -15,14 +15,29 @@ def pde(dudt, d2udx2, alpha):
     Calculate residual of differential heat equation.
 
     Parameters:
-    dudt (torch.Tensor): the first derivative with respect to time
-    d2udx2 (torch.Tensor): the second derivative with respect to space
-    alpha (torch.Tensor): a constant parameter (thermal diffusivity coefficient)
+        dudt (torch.Tensor): First derivative with respect to time.
+        d2udx2 (torch.Tensor): Second derivative with respect to space.
+        alpha (torch.Tensor): A constant parameter (thermal diffusivity coefficient).
 
     Returns:
-    torch.Tensor: the result of the PDE calculation
+        torch.Tensor: Result of the PDE calculation
     """
     return dudt - alpha**2 * d2udx2
+
+def pde2d(dudt, d2udx2, d2udy2, alpha):
+    """
+    Calculate residual of differential heat equation.
+
+    Parameters:
+        dudt (torch.Tensor): First derivative with respect to time.
+        d2udx2 (torch.Tensor): Second derivative with respect to space (x).
+        d2udy2 (torch.Tensor): Second derivative with respect to space (y).
+        alpha (torch.Tensor): A constant parameter (thermal diffusivity coefficient).
+
+    Returns:
+        torch.Tensor: Result of the PDE calculation
+    """
+    return dudt - alpha**2 * (d2udx2 + d2udy2)
 
 
 class PINN():
@@ -34,10 +49,17 @@ class PINN():
         self.x_boundary, self.t_boundary, self.u_boundary = problem.boundary_conditions.get_boundary_conditions()
         
         # Equation points
-        self.x_equation, self.t_equation = problem.equation.get_equation()
+        self.x_equation, self.t_equation = problem.equation.get_equation_points()
+
+        # PDE
+        self.pde = problem.equation.pde
 
         # Coefficient of thermal diffusivity
         self.alpha = problem.alpha
+
+        # Problem dimensions
+        self.dims = problem.geom.get_dimension()
+        print(self.dims)
 
         # Device
         self.device = device
@@ -280,25 +302,94 @@ class PINN():
                 layer_num += 1
         print("----------")
 
-    def function(self, x, t, is_equation=False):
-        u_pred = self.net(torch.stack((x, t)).T)
+    def function(self, x, t, derivatives=[], is_equation=False):
+        results = {}
 
-        if is_equation:
-            dudx = torch.autograd.grad(u_pred, x,
-                                       grad_outputs=torch.ones_like(u_pred), 
-                                       create_graph=True,
-                                       allow_unused=True)[0]
-            d2udx2 = torch.autograd.grad(dudx, x,
-                                         grad_outputs=torch.ones_like(dudx), 
-                                         create_graph=True,
-                                         allow_unused=True)[0]
-            dudt = torch.autograd.grad(u_pred, t,
-                                       grad_outputs=torch.ones_like(u_pred), 
-                                       create_graph=True,
-                                       allow_unused=True)[0]
-            return u_pred, dudt, d2udx2
+        if is_equation:            
+            if self.dims == 1:
+                u_pred = self.net(torch.cat((x, t), dim=1))
+                if 'dudx' in derivatives:
+                    dudx = torch.autograd.grad(u_pred, x,
+                                               grad_outputs=torch.ones_like(u_pred), 
+                                               create_graph=True, allow_unused=True)[0]
+                    results['dudx'] = dudx
 
-        return u_pred
+                if 'd2udx2' in derivatives:
+                    dudx = torch.autograd.grad(u_pred, x,
+                                               grad_outputs=torch.ones_like(u_pred), 
+                                               create_graph=True, allow_unused=True)[0]
+                    d2udx2 = torch.autograd.grad(dudx, x,
+                                                 grad_outputs=torch.ones_like(dudx), 
+                                                 create_graph=True, allow_unused=True)[0]
+                    results['d2udx2'] = d2udx2
+
+            elif self.dims == 2:
+                x_component, y_component = x[:, 0].reshape(-1, 1), x[:, 1].reshape(-1, 1)
+                u_pred = self.net(torch.cat((x_component, y_component, t), dim=1))
+                if 'dudx' in derivatives:
+                    dudx = torch.autograd.grad(u_pred, x_component,
+                                               grad_outputs=torch.ones_like(u_pred), 
+                                               create_graph=True, allow_unused=True)[0]
+                    results['dudx'] = dudx
+
+                if 'dudy' in derivatives:
+                    dudy = torch.autograd.grad(u_pred, y_component,
+                                               grad_outputs=torch.ones_like(u_pred), 
+                                               create_graph=True, allow_unused=True)[0]
+                    results['dudy'] = dudy
+
+                if 'd2udx2' in derivatives:
+                    dudx = torch.autograd.grad(u_pred, x_component,
+                                               grad_outputs=torch.ones_like(u_pred), 
+                                               create_graph=True, allow_unused=True)[0]
+                    d2udx2 = torch.autograd.grad(dudx, x_component,
+                                                 grad_outputs=torch.ones_like(dudx), 
+                                                 create_graph=True, allow_unused=True)[0]
+                    results['d2udx2'] = d2udx2
+
+                if 'd2udy2' in derivatives:
+                    dudy = torch.autograd.grad(u_pred, y_component,
+                                               grad_outputs=torch.ones_like(u_pred), 
+                                               create_graph=True, allow_unused=True)[0]
+                    d2udy2 = torch.autograd.grad(dudy, y_component,
+                                                 grad_outputs=torch.ones_like(dudy), 
+                                                 create_graph=True, allow_unused=True)[0]
+                    results['d2udy2'] = d2udy2
+
+                if 'd2udxy' in derivatives:
+                    dudx = torch.autograd.grad(u_pred, x_component,
+                                               grad_outputs=torch.ones_like(u_pred), 
+                                               create_graph=True, allow_unused=True)[0]
+                    d2udxy = torch.autograd.grad(dudx, y_component,
+                                                 grad_outputs=torch.ones_like(dudx), 
+                                                 create_graph=True, allow_unused=True)[0]
+                    results['d2udxy'] = d2udxy
+
+            else:
+                raise ValueError("x must be a 1D or 2D tensor")
+
+            if 'dudt' in derivatives:
+                dudt = torch.autograd.grad(u_pred, t,
+                                           grad_outputs=torch.ones_like(u_pred), 
+                                           create_graph=True, allow_unused=True)[0]
+                results['dudt'] = dudt
+
+            if 'd2udt2' in derivatives:
+                dudt = torch.autograd.grad(u_pred, t,
+                                           grad_outputs=torch.ones_like(u_pred), 
+                                           create_graph=True, allow_unused=True)[0]
+                d2udt2 = torch.autograd.grad(dudt, t,
+                                             grad_outputs=torch.ones_like(dudt), 
+                                             create_graph=True, allow_unused=True)[0]
+                results['d2udt2'] = d2udt2
+            return u_pred, results
+        else:
+            if self.dims == 1:
+                u_pred = self.net(torch.cat((x, t), dim=1))
+            if self.dims == 2:
+                x_component, y_component = x[:, 0].reshape(-1, 1), x[:, 1].reshape(-1, 1)
+                u_pred = self.net(torch.cat((x_component, y_component, t), dim=1))
+            return u_pred
 
     def closure(self):
         if hasattr(self.optimizer, 'step_closure'):
@@ -316,12 +407,23 @@ class PINN():
             self.boundary_loss = self.mse(u_prediction, self.u_boundary)
 
             # Equation loss
-            _, dudt, d2udx2 = self.function(self.x_equation, 
-                                            self.t_equation, 
-                                            is_equation=True)
-            heat_eq_prediction = pde(dudt, d2udx2, self.alpha)
-            self.equation_loss = self.mse(heat_eq_prediction, self.null)
+            # _, dudt, d2udx2 = self.function(self.x_equation, 
+            #                                 self.t_equation, 
+            #                                 is_equation=True)
+            # heat_eq_prediction = pde(dudt, d2udx2, self.alpha)
+            # self.equation_loss = self.mse(heat_eq_prediction, self.null)
 
+            # New equation loss
+            derivatives_names = ['dudt', 'd2udx2', 'd2udy2']
+            _, derivatives = self.function(self.x_equation, self.t_equation, 
+                                               derivatives=derivatives_names,
+                                               is_equation=True)
+            # dudt = derivatives.get('dudt')
+            # d2udx2 = derivatives.get('d2udx2')
+            # d2udy2 = derivatives.get('d2udy2')
+            
+            heat_eq_prediction = self.pde.substitute_into_equation(derivatives)
+            self.equation_loss = self.mse(heat_eq_prediction, self.null)
 
             # Total loss
             self.loss = (self.weight_ic * self.initial_loss + 
@@ -334,7 +436,7 @@ class PINN():
             elif self.regularization == "Ridge":
                 self.loss += self.ridge(self.lambda_reg)
             elif self.regularization == "Elastic":
-                self.loss += self.elastic(self.lambda_reg, self.l1_ratio)
+                self.loss += self.elastic(self.lambda_reg)
 
             # Derivative with respect to weights
             self.loss.backward(retain_graph=True)
@@ -355,22 +457,23 @@ class PINN():
         
     def lasso(self, lambda_reg):
         l1_reg = torch.tensor(0., requires_grad=True)
-        for param in self.parameters():
-            l1_reg += torch.norm(param, p=1)
+        for param in self.net.parameters():
+            l1_reg = l1_reg + torch.norm(param, p=1)
         return lambda_reg * l1_reg
 
     def ridge(self, lambda_reg):
         l2_reg = torch.tensor(0., requires_grad=True)
-        for param in self.parameters():
-            l2_reg += torch.norm(param)
+        for param in self.net.parameters():
+            l2_reg = l2_reg + torch.norm(param)
         return lambda_reg * l2_reg
     
-    def elastic(self, lambda_reg, l1_ratio):
+    def elastic(self, lambda_reg):
         l1_reg = torch.tensor(0., requires_grad=True)
         l2_reg = torch.tensor(0., requires_grad=True)
-        for param in self.parameters():
-            l1_reg += torch.norm(param, p=1)
-            l2_reg += torch.norm(param)
+        l1_ratio = 0.5
+        for param in self.net.parameters():
+            l1_reg = l1_reg + torch.norm(param, p=1)
+            l2_reg = l2_reg + torch.norm(param)
         return lambda_reg * l1_ratio * l1_reg + lambda_reg * (1 - l1_ratio) * l2_reg
 
     def train(self):
