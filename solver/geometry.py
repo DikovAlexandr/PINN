@@ -38,7 +38,11 @@ class Geometry(ABC):
     @abstractmethod
     def get_dimension(self) -> int:
         raise NotImplementedError
-
+    
+    @abstractmethod
+    def grid_spacing_inners(self) -> float:
+        raise NotImplementedError
+    
 
 class Geometry1D(Geometry):
     @abstractmethod
@@ -47,10 +51,6 @@ class Geometry1D(Geometry):
     
     @abstractmethod
     def limits(self) -> Tuple[float, float]:
-        pass
-    
-    @abstractmethod
-    def grid_spacing(self) -> float:
         pass
 
     def get_dimension(self) -> int:
@@ -68,10 +68,6 @@ class Geometry2D(Geometry):
     
     @abstractmethod
     def grid_spacing_boundary(self) -> float:
-        pass
-
-    @abstractmethod
-    def grid_spacing_inners(self) -> float:
         pass
 
     def get_dimension(self) -> int:
@@ -107,11 +103,16 @@ class Interval(Geometry1D):
         """
         return (self.x_left, self.x_right)
     
-    def inside(self, x: float) -> bool:
+    def inside(self, x: Union[float, list, torch.Tensor]) -> Union[bool, torch.Tensor]:
         """
         Returns True if the point is inside the interval.
         """
-        return (x >= self.x_left) & (x <= self.x_right)
+        if isinstance(x, float):
+            return (x >= self.x_left) & (x <= self.x_right)
+        elif isinstance(x, list) or isinstance(x, torch.Tensor):
+            return (x[0] >= self.x_left) & (x[0] <= self.x_right)
+        else:
+            raise TypeError("Unsupported type for x")
 
     def boundary(self, num_points: int, 
                  device="cuda:0", random=False) -> torch.Tensor:
@@ -171,7 +172,7 @@ class Interval(Geometry1D):
         """
         self.inners_points = torch.cat([self.inners_points, new_inners_points])
     
-    def grid_spacing(self) -> float:
+    def grid_spacing_inners(self) -> float:
         """
         Returns the grid spacing.
         """                
@@ -216,13 +217,17 @@ class Rectangle(Geometry2D):
         """ 
         return ((self.x_min, self.x_max), (self.y_min, self.y_max))
 
-    def inside(self, x: Union[np.ndarray, List[float], Tuple[float, ...]]) -> bool:
+    def inside(self, x: Union[np.ndarray, List[float], Tuple[float, ...], torch.Tensor]) -> Union[bool, torch.Tensor]:
         """
         Returns True if the point is inside the rectangle.
         """
-        x = np.asarray(x)
-        return ((x[0] >= self.x_min) & (x[0] <= self.x_max) & 
-                (x[1] >= self.y_min) & (x[1] <= self.y_max))
+        if isinstance(x, torch.Tensor):
+            return ((x[0] >= self.x_min) & (x[0] <= self.x_max) & 
+                    (x[1] >= self.y_min) & (x[1] <= self.y_max))
+        else:
+            x = np.asarray(x)
+            return ((x[0] >= self.x_min) & (x[0] <= self.x_max) & 
+                    (x[1] >= self.y_min) & (x[1] <= self.y_max))
 
     def boundary(self, num_points: int, 
                  device="cuda:0", random=False) -> torch.Tensor:
@@ -393,13 +398,17 @@ class Ellipse(Geometry2D):
         return ((self.x_center - self.x_radius, self.x_center + self.x_radius),
                 (self.y_center - self.y_radius, self.y_center + self.y_radius))
 
-    def inside(self, x: Union[np.ndarray, List[float], Tuple[float, ...]]) -> bool:
+    def inside(self, x: Union[np.ndarray, List[float], Tuple[float, ...], torch.Tensor]) -> Union[bool, torch.Tensor]:
         """
         Returns True if x is inside the ellipse.
         """
-        x = np.asarray(x)
-        return (((x[0] - self.x_center) / self.x_radius) ** 2 + 
-                ((x[1] - self.y_center) / self.y_radius) ** 2 <= 1)
+        if isinstance(x, torch.Tensor):
+            return (((x[0] - self.x_center) / self.x_radius) ** 2 + 
+                    ((x[1] - self.y_center) / self.y_radius) ** 2 <= 1)
+        else:
+            x = np.asarray(x)
+            return (((x[0] - self.x_center) / self.x_radius) ** 2 + 
+                    ((x[1] - self.y_center) / self.y_radius) ** 2 <= 1)
 
     def boundary(self, num_points: int, 
                  device="cuda:0", random=False) -> torch.Tensor:

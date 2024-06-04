@@ -1,6 +1,9 @@
 import numpy as np
 import torch
 
+from solver.geometry import Geometry
+from solver.timedomain import TimeDomain
+
 # Class for loss weight adjustment based on the loss values
 class LossWeightAdjuster:
     def __init__(self, max_weight, min_weight, threshold, scaling_factor):
@@ -20,47 +23,87 @@ class LossWeightAdjuster:
         return adjusted_weights
 
 # Collocation points resampling algorithm based on the RAR from the paper "DeepXDE"
-def rar_points(geom, period, X, T, errors, num_points, epsilon, random=True):
-    max_index = np.argmax(np.absolute(errors))
+def rar_points(geom: Geometry, 
+               period: TimeDomain, 
+               X: torch.Tensor, T: torch.Tensor, 
+               errors: torch.Tensor, 
+               num_points: int, epsilon: float, random=True) -> tuple:
+    """
+    Residual-based Adaptive Refinement (RAR) for collocation point placement.
+
+    This function identifies the point with the maximum absolute error and adds new points 
+    around it to improve the model's accuracy in regions of high error.
+
+    Parameters:
+        geom (Geometry): An object representing the spatial domain.
+        period (TimeDomain): An object representing the time domain.
+        X (torch.Tensor): Spatial coordinates of existing collocation points.
+        T (torch.Tensor): Time coordinates of existing collocation points.
+        errors (torch.Tensor): Array of errors at each existing collocation point.
+        num_points (int): Number of new points to add.
+        epsilon (float): Radius around the maximum error point to sample new points.
+        random (bool, optional): Whether to sample points randomly or on a grid. Defaults to True.
+
+    Returns:
+        tuple: A tuple containing:
+            - x (torch.Tensor): Spatial coordinates of the new collocation points.
+            - t (torch.Tensor): Time coordinates of the new collocation points.
+            - center_coords (tuple): Coordinates (x, t) of the point with the maximum error.
+    """
+
+    device = X.device
+    max_index = torch.argmax(torch.abs(errors))
     center_coords = [X[max_index], T[max_index]]
     dimension = len(center_coords[0])
 
     if random:
-        x_extra = center_coords[0] + np.random.normal(0, epsilon, size=(num_points, dimension))
-        t_extra = center_coords[1] + np.random.normal(0, epsilon, num_points)
+        x_extra = center_coords[0] + torch.randn(num_points, dimension) * epsilon
+        t_extra = center_coords[1] + torch.randn(num_points) * epsilon
     else:
         n = int((num_points ** (1/(1+dimension))) / 2)
-        x_extra = []
-        for i in range(dimension):
-            x_i = center_coords[0][i] + np.linspace(-geom.grid_spacing_inners()[i] * n,
-                                                    geom.grid_spacing_inners()[i] * n, 2 * n + 1)
-            x_extra.append(x_i)
-        x_extra = np.column_stack(x_extra)
-        t_extra = center_coords[1] + np.linspace(-period.grid_spacing_inners() * n,
-                                         period.grid_spacing_inners() * n, 2*n + 1)
+
+        if dimension == 1:
+            x_extra = center_coords[0] + torch.linspace(-geom.grid_spacing_inners() * n,
+                                                        geom.grid_spacing_inners() * n, 
+                                                        2 * n + 1, dtype=X.dtype).to(device)
+            x_extra = x_extra.reshape(-1, 1)
+        elif dimension == 2:
+            x_extra = []
+            for i in range(dimension):
+                x_i = center_coords[0][i] + torch.linspace(-geom.grid_spacing_inners()[i] * n,
+                                                           geom.grid_spacing_inners()[i] * n, 
+                                                           2 * n + 1, dtype=X.dtype).to(device)
+                x_extra.append(x_i)
+            x_extra = torch.stack(x_extra, dim=1)
+        
+        t_extra = center_coords[1] + torch.linspace(-period.grid_spacing_inners() * n,
+                                                    period.grid_spacing_inners() * n, 
+                                                    2*n + 1, dtype=T.dtype).to(device)
         # Make a grid
         if dimension == 1:
-            x_extra, t_extra = np.meshgrid(x_extra,  t_extra)
-            x_extra = x_extra.flatten()
-            t_extra = t_extra.flatten()
+            x_extra, t_extra = torch.meshgrid(x_extra.squeeze(), t_extra)
+            x_extra = x_extra.flatten().reshape(-1, 1)
+            t_extra = t_extra.flatten().reshape(-1, 1)
         elif dimension == 2:
-            x_extra, y_extra, t_extra = np.meshgrid(x_extra[:, 0],  x_extra[:, 1], t_extra)
-            x_extra = np.column_stack((x_extra.flatten(), y_extra.flatten()))
-            t_extra = t_extra.flatten()
+            x_extra, y_extra, t_extra = torch.meshgrid(x_extra[:, 0],
+                                                       x_extra[:, 1], 
+                                                       t_extra)
+            x_extra = torch.stack((x_extra.flatten(), y_extra.flatten()), dim=1)
+            t_extra = t_extra.flatten().reshape(-1, 1)
     
     # Clip offsets to the boundaries
     new_points = []
     for x, t in zip(x_extra, t_extra):
-        new_points.append([x.tolist(), t])
-    new_points = [point for point in new_points if geom.inside(point[0]) and period.inside(point[1])]
-    x = np.array([item[0] for item in new_points])
-    t = np.array([item[1] for item in new_points])
+        if geom.inside(x.tolist()) and period.inside(t.item()):
+            new_points.append([x, t])
+    x = torch.stack([item[0] for item in new_points], dim=0).to(X.dtype)
+    t = torch.stack([item[1] for item in new_points], dim=0).to(T.dtype)
     return x, t, (center_coords[0], center_coords[1])
 
 # Class for hybrid optimization based on the paper
 # "The Old and the New: Can Physics-Informed Deep-Learning Replace Traditional Linear Solvers?"
 class HybridOptimizer:
-    def __init__(self, model, switch_epoch=2000, switch_threshold=1e-3):
+    def __init__(self, model, switch_epoch=2000, switch_threshold=1e-2):
         self.model = model
         self.switch_iter = switch_epoch
         self.switch_threshold = switch_threshold
@@ -129,3 +172,4 @@ class EarlyStopping:
             self.counter += 1
             if self.counter >= self.patience:
                 self.early_stop = True
+                                                

@@ -198,7 +198,7 @@ class Problem:
                  equation: Equation, 
                  test: Test, 
                  geom: Geometry, 
-                 time: TimeDomain, 
+                 period: TimeDomain, 
                  alpha: float):
         """
         Initialize the problem.
@@ -217,7 +217,7 @@ class Problem:
         self.equation = equation
         self.test = test
         self.geom = geom
-        self.time = time
+        self.period = period
         self.alpha = alpha
 
     def get_problem(self):

@@ -1,4 +1,5 @@
 import os
+import time
 import torch
 import numpy as np
 
@@ -42,6 +43,9 @@ def pde2d(dudt, d2udx2, d2udy2, alpha):
 
 class PINN():
     def __init__(self, problem, net_params, device='cuda:0'):
+        # Problem
+        self.problem = problem
+
         # Initial points
         self.x_initial, self.t_initial, self.u_initial = problem.initial_conditions.get_initial_conditions()
         
@@ -72,7 +76,7 @@ class PINN():
         # Training parameters
         self.epochs = net_params.epochs
         self.batch_size = net_params.batch_size
-        self.training_mode = net_params.training_mode # (train on sample or full data)
+        self.training_mode = net_params.training_mode # (train on samples or full data)
 
         # Activation function
         activations = {
@@ -122,7 +126,7 @@ class PINN():
         elif net_params.optimizer == 'Hybrid':
             self.optimizer = enhancements.HybridOptimizer(self.net.parameters(),
                                                           switch_epoch=1000,
-                                                          switch_threshold=10)
+                                                          switch_threshold=0.01)
             self.optimizer.set_optimizer_adam(torch.optim.Adam(self.net.parameters()))
             self.optimizer.set_optimizer_lbfgs(torch.optim.LBFGS(self.net.parameters()))
             self.optimizer.use_optimizer_adam()
@@ -153,6 +157,10 @@ class PINN():
         # Use RAR
         if net_params.use_rar:
             self.use_rar = True
+            self.rar_epsilon = 0.05
+            self.rar_num_points = 10
+            self.rar_interval = 50
+            self.rar_random = False
         else:
             self.use_rar = False
 
@@ -174,7 +182,7 @@ class PINN():
             # utils.create_or_clear_folder(self.output_path)
             utils.create_folder(self.output_path)
         else:
-            self.output_path = './output'
+            self.output_path = os.path.join(os.getcwd(), 'output')
             utils.create_or_clear_folder(self.output_path)
 
         # Save loss history
@@ -206,8 +214,10 @@ class PINN():
         
         existing_models = os.listdir(self.output_path)
         existing_numbers = [int(name.split('_')[-1].split('.')[0]) for name in existing_models if name.startswith(base_name) and name.split('_')[-1].split('.')[0].isdigit()]
-        
+        existing_weights = os.listdir(self.model_save_path)
+        existing_numbers = existing_numbers + [int(weight.split('_')[-1].split('.')[0]) for weight in existing_weights if weight.startswith(base_name) and weight.split('_')[-1].split('.')[0].isdigit()]
         next_number = 0 if not existing_numbers else max(existing_numbers) + 1
+
         print("Next number:", next_number)
         model_name = f"{base_name}_{next_number}"
         return model_name
@@ -249,7 +259,7 @@ class PINN():
             return sorted_x, sorted_t, sorted_u
         
     def network(self):
-        if isinstance(self.activation, siren.Sin): # SIREN
+        if isinstance(self.activation, siren.Sin): # Siren
             # First linear layer
             layers = [siren.SineLayer(self.input, self.hidden_layers[0], 
                                       is_first=True, omega_0=self.first_omega_0)]
@@ -445,13 +455,32 @@ class PINN():
             # Print current loss
             if self.iter % self.display_interval == 0:
                 exact_loss = self.initial_loss + self.boundary_loss + self.equation_loss
-                print(f'Iteration {self.iter}: Loss {exact_loss}')
+                elapsed_time = time.time() - self.start_time
+                print(f'Iteration {self.iter}: Loss {exact_loss}, Weighted Loss {self.loss.item()}, Time {elapsed_time}')
 
-            if self.iter % self.display_interval == 0 and self.save_loss:
+            if self.save_loss and self.iter % self.display_interval == 0:
                 # Write to file
                 exact_loss = self.initial_loss + self.boundary_loss + self.equation_loss
+                elapsed_time = time.time() - self.start_time
                 with open(f'{self.output_path}/{self.model_name}.csv', 'a') as f:
-                    f.write(f"{self.iter}, {exact_loss}\n")
+                    f.write(f"{self.iter}, {exact_loss}, {elapsed_time}\n")
+
+            if self.use_rar and self.iter % self.rar_interval == 0:
+                x_extra, t_extra, center_coords = enhancements.rar_points(self.problem.geom, 
+                                                                            self.problem.period,
+                                                                            self.x_equation, 
+                                                                            self.t_equation, 
+                                                                            heat_eq_prediction, 
+                                                                            self.rar_num_points, 
+                                                                            self.rar_epsilon,
+                                                                            self.rar_random)
+                
+                # print(f"Added {len(x_extra)} points around ({float(center_coords[0])}, {float(center_coords[1])})")
+                self.x_equation = torch.cat((self.x_equation, 
+                                                x_extra.to(self.device)), dim=0).requires_grad_(True)
+                self.t_equation = torch.cat((self.t_equation, 
+                                                t_extra.to(self.device)), dim=0).requires_grad_(True)
+                self.null = torch.zeros((len(self.x_equation), 1), device=self.device)
 
             return self.loss
         
@@ -479,6 +508,9 @@ class PINN():
     def train(self):
         self.net.train()
         print(f"Oprtimizer: {self.optimizer.__class__.__name__}")
+        
+        # Start timer
+        self.start_time = time.time()
 
         if isinstance(self.optimizer, torch.optim.LBFGS):
             self.optimizer.zero_grad()
@@ -559,5 +591,5 @@ class PINN():
         model_weights = {}
         for name, param in self.net.named_parameters():
             model_weights[name] = param.data
-        torch.save(model_weights, f'{self.model_save_path}/{self.model_name}_weights.pth')
+        torch.save(model_weights, f'{self.model_save_path}/{self.model_name}.pth')
         print("Model weights saved to", self.model_save_path)
