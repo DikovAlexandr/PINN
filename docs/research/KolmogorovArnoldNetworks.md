@@ -1,3 +1,6 @@
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.13.11/dist/katex.min.css" integrity="sha384-Um5gpz0p1KX0VdYzlG2lnx7P4c75Kn9oBnZ5VAt2Nx+e3ejDQyWFSV5h0e3zInIv" crossorigin="anonymous">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.13.11/dist/katex.min.js" integrity="sha384-9eLZ7uKsGm4e6JYO2B6o6HgRtGgzoVMcXqL1RtG3O/4GmRkPCvZjzL7FfyKW+X+D" crossorigin="anonymous"></script>
+
 # Анализ статьи "KAN: Kolmogorov-Arnold Networks"
 
 - [Ссылка на статью](https://arxiv.org/abs/2404.19756)
@@ -21,7 +24,6 @@
 $$
 f(x_1, \ldots, x_n) = \sum_{q=0}^{2n} \Phi_q \left(\sum_{p=1}^{n} \phi_{q,p}(x_p)\right). 
 $$
-S
 Это представление позволяет KAN использовать обучаемые функции активации, параметризованные как сплайны, на ребрах сети, что отличается от традиционных MLP, где функции активации фиксированы и применяются к узлам. В KAN каждый вес в сети заменяется на одномерную функцию.
 
 ## Архитектура KAN
