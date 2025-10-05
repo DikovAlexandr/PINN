@@ -1,65 +1,79 @@
+"""Utility functions and classes for PINN solver module."""
+
 import os
 import json
-import torch
 import shutil
+from typing import List, Optional, Union
+
 import numpy as np
 import pandas as pd
-from typing import List
+import torch
 import matplotlib.pyplot as plt
 
 
 
 class NetParams:
+    """Network parameters configuration class."""
+    
     def __init__(self):
-        self.input = None
-        self.output = None
-        self.hidden_layers = None
+        """Initialize NetParams with default None values."""
+        self.input: Optional[int] = None
+        self.output: Optional[int] = None
+        self.hidden_layers: Optional[List[int]] = None
 
-        self.epochs = None
-        self.batch_size = None
-        self.lr = None
-        self.activation = None
-        self.training_mode = None
-        self.optimizer = None
+        self.epochs: Optional[int] = None
+        self.batch_size: Optional[int] = None
+        self.lr: Optional[float] = None
+        self.activation: Optional[str] = None
+        self.training_mode: Optional[str] = None
+        self.optimizer: Optional[str] = None
 
-        self.early_stopping = None
-        self.start_weights = None
-        self.use_rar = None
-        self.use_loss_weight_adjuster = None
+        self.early_stopping: Optional[bool] = None
+        self.start_weights: Optional[str] = None
+        self.use_rar: Optional[bool] = None
+        self.use_loss_weight_adjuster: Optional[bool] = None
 
-        self.display_interval = None
-        self.model_save_path = None
-        self.output_path = None
-        self.initial_weights_path = None
+        self.display_interval: Optional[int] = None
+        self.model_save_path: Optional[str] = None
+        self.output_path: Optional[str] = None
+        self.initial_weights_path: Optional[str] = None
 
-        self.siren_params = None
+        self.siren_params: Optional[object] = None
 
-    def set_params(self, input: int, output: int, hidden_layers: List[int],
-                   epochs: int, batch_size: int,
+    def set_params(self, input_dim: int, output_dim: int, 
+                   hidden_layers: List[int], epochs: int, batch_size: int,
                    lr: float, activation: str, training_mode: str,
                    regularization: str, lambda_reg: float,
-                   optimizer, scheduler,
-                   early_stopping, use_rar, use_weights_adjuster,
-                   display_interval, model_save_path, output_path, save_loss,
-                   initial_weights_path, siren_params):
-        """
-        Parameters:
-            input (int): The input dimension of the model.
-            output (int): The output dimension of the model.
-            hidden_layers (list): A list of integers representing the number of neurons in each hidden layer.
+                   optimizer: str, scheduler: Optional[str],
+                   early_stopping: bool, use_rar: bool, 
+                   use_weights_adjuster: bool, display_interval: int,
+                   model_save_path: str, output_path: str, save_loss: bool,
+                   initial_weights_path: Optional[str], 
+                   siren_params: Optional[object]) -> None:
+        """Set network parameters.
+        
+        Args:
+            input_dim: The input dimension of the model.
+            output_dim: The output dimension of the model.
+            hidden_layers: A list of integers representing the number of 
+                neurons in each hidden layer.
             epochs: The number of epochs for training.
             batch_size: The number of samples per batch.
             lr: The learning rate for the model.
             activation: The activation function for the hidden layers.
             training_mode: The mode of training, e.g., 'train' or 'test'.
-            regularization: The type of regularization to use. Might be 'Lasso', 'Ridge' or 'Elastic'.
+            regularization: The type of regularization to use. 
+                Options: 'Lasso', 'Ridge' or 'Elastic'.
             lambda_reg: The coefficient of the regularization.
-            optimizer: The optimizer for model training. Might be 'LBFGS', 'Adam' or 'Hybrid'.
-            scheduler: The scheduler for model training. Might be 'StepLR', 'ExponentialLR', 'ReduceLROnPlateau'.
+            optimizer: The optimizer for model training. 
+                Options: 'LBFGS', 'Adam' or 'Hybrid'.
+            scheduler: The scheduler for model training. 
+                Options: 'StepLR', 'ExponentialLR', 'ReduceLROnPlateau'.
             early_stopping: Boolean indicating whether to use early stopping.
-            start_weights: Path to initial weights for the model.
-            use_rar: Boolean indicating whether to use relative angular representations.
-            use_weights_adjuster: Boolean indicating whether to use the loss weight adjuster.
+            use_rar: Boolean indicating whether to use RAR (Residual-based 
+                Adaptive Refinement).
+            use_weights_adjuster: Boolean indicating whether to use the 
+                loss weight adjuster.
             display_interval: The interval for displaying training progress.
             model_save_path: The path to save the trained model.
             output_path: The path to save the output.
@@ -67,9 +81,8 @@ class NetParams:
             initial_weights_path: The path to load initial weights for the model.
             siren_params: Additional parameters for the SIREN model.
         """
-        # TODO: add constructor as "[2] + [20] * 3 + [1]"
-        self.input = input
-        self.output = output
+        self.input = input_dim
+        self.output = output_dim
         self.hidden_layers = hidden_layers
 
         self.epochs = epochs
@@ -91,32 +104,38 @@ class NetParams:
         self.display_interval = display_interval
         self.model_save_path = model_save_path
         self.output_path = output_path
-        self.save_loss = save_loss,
+        self.save_loss = save_loss
         self.initial_weights_path = initial_weights_path
 
-        if siren_params == None:
-            self.siren_params = None
-        else:
-            self.siren_params = siren_params
+        self.siren_params = siren_params
 
     @classmethod
-    def from_json_file(cls, file_path):
+    def from_json_file(cls, file_path: str) -> 'NetParams':
+        """Create NetParams instance from JSON configuration file.
+        
+        Args:
+            file_path: Path to the JSON configuration file.
+            
+        Returns:
+            NetParams instance with parameters loaded from file.
+        """
         with open(file_path, "r") as json_file:
             config_data = json.load(json_file)
 
-        return cls(
-            input=config_data["input"],
-            output=config_data["output"],
+        instance = cls()
+        instance.set_params(
+            input_dim=config_data["input"],
+            output_dim=config_data["output"],
             hidden_layers=config_data["hidden_layers"],
             epochs=config_data["epochs"],
             batch_size=config_data["batch_size"],
-            learning_rate=config_data["learning_rate"],
+            lr=config_data["lr"],
             activation=config_data["activation"],
             training_mode=config_data["training_mode"],
-            regularization=config_data["regularization"],
-            lambda_reg=config_data["lambda_reg"],
+            regularization=config_data.get("regularization", "None"),
+            lambda_reg=config_data.get("lambda_reg", 0.0),
             optimizer=config_data["optimizer"],
-            scheduler=config_data["scheduler"],
+            scheduler=config_data.get("scheduler", None),
             early_stopping=config_data["early_stopping"],
             use_rar=config_data["use_rar"],
             use_weights_adjuster=config_data["use_weights_adjuster"],
@@ -124,18 +143,19 @@ class NetParams:
             model_save_path=config_data["model_save_path"],
             output_path=config_data["output_path"],
             save_loss=config_data["save_loss"],
-            initial_weights_path=config_data["initial_weights_path"],
-            siren_params=config_data["siren_params"]
+            initial_weights_path=config_data.get("initial_weights_path", None),
+            siren_params=config_data.get("siren_params", None)
         )
+        return instance
 
 
-def create_or_clear_folder(folder_path: str):
-    """
-    Deletes all files and subdirectories in the specified folder path if it exists, 
-    excluding .md files. If the folder does not exist, creates a new folder at the specified path.
+def create_or_clear_folder(folder_path: str) -> None:
+    """Delete all files and subdirectories in the specified folder path if it exists, 
+    excluding .md files. If the folder does not exist, creates a new folder at the 
+    specified path.
 
-    Parameters:
-        folder_path (str): The path of the folder to delete or create.
+    Args:
+        folder_path: The path of the folder to delete or create.
     """
     if os.path.exists(folder_path):
         for filename in os.listdir(folder_path):
@@ -154,25 +174,23 @@ def create_or_clear_folder(folder_path: str):
     else:
         os.makedirs(folder_path)
 
-def create_folder(folder_path: str):
-    """
-	Create a folder at the specified path if it does not already exist.
+def create_folder(folder_path: str) -> None:
+    """Create a folder at the specified path if it does not already exist.
 
-	Parameters:
-        folder_path (str): the path of the folder to be created
-	"""
+    Args:
+        folder_path: The path of the folder to be created.
+    """
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
 
-def split_number(number):
-    """
-    Splits a number into four parts using a normal distribution.
+def split_number(number: int) -> tuple[int, int, int, int]:
+    """Split a number into four parts using a normal distribution.
     
-    Parameters:
-        number (int): The number to split.
+    Args:
+        number: The number to split.
     
     Returns:
-        part1, part2, part3, part4 (int): The four parts of the number.
+        A tuple of four integers representing the four parts of the number.
     """
     half = number // 2
 
@@ -185,13 +203,12 @@ def split_number(number):
 
 
 def to_numpy(tensor: torch.Tensor) -> np.ndarray:
-    """
-    Convert a PyTorch tensor to a NumPy array.
+    """Convert a PyTorch tensor to a NumPy array.
 
-    Parameters:
-        tensor (torch.Tensor): The input PyTorch tensor.
+    Args:
+        tensor: The input PyTorch tensor.
 
     Returns:
-        numpy.ndarray: A NumPy array converted from the input tensor.
+        A NumPy array converted from the input tensor.
     """
     return tensor.cpu().detach().numpy()

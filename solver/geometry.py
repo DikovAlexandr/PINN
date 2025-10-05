@@ -1,128 +1,162 @@
+"""Geometry classes for defining spatial domains in PINN problems."""
+
 from abc import ABC, abstractmethod
+from typing import Tuple, Union, List, Optional
+
 import numpy as np
 import torch
-from typing import Tuple, Union, List
 
 from .utils import split_number
 
 
 class Geometry(ABC):
+    """Abstract base class for geometric domains."""
+    
     @abstractmethod
-    def inside(self) -> bool:
+    def inside(self, x: Union[float, List[float], torch.Tensor]) -> Union[bool, torch.Tensor]:
+        """Check if point(s) are inside the domain."""
         raise NotImplementedError
     
     @abstractmethod
-    def boundary(self) -> torch.Tensor:
+    def boundary(self, num_points: int, device: str = "cuda:0", 
+                 random: bool = False) -> torch.Tensor:
+        """Generate boundary points."""
         raise NotImplementedError
     
     @abstractmethod
     def get_boundary(self) -> torch.Tensor:
+        """Get stored boundary points."""
         raise NotImplementedError
 
     @abstractmethod       
-    def add_boundary(self) -> None:
+    def add_boundary(self, new_boundary_points: torch.Tensor) -> None:
+        """Add new boundary points."""
         raise NotImplementedError
     
     @abstractmethod
-    def inners(self) -> torch.Tensor:
+    def inners(self, num_points: int, device: str = "cuda:0", 
+               random: bool = False) -> torch.Tensor:
+        """Generate interior points."""
         raise NotImplementedError
 
     @abstractmethod   
     def get_inners(self) -> torch.Tensor:
+        """Get stored interior points."""
         raise NotImplementedError
     
     @abstractmethod
-    def add_inners(self, new_inners_points) -> None:
+    def add_inners(self, new_inners_points: torch.Tensor) -> None:
+        """Add new interior points."""
         raise NotImplementedError
     
     @abstractmethod
     def get_dimension(self) -> int:
+        """Get spatial dimension of the domain."""
         raise NotImplementedError
     
     @abstractmethod
-    def grid_spacing_inners(self) -> float:
+    def grid_spacing_inners(self) -> Union[float, Tuple[float, ...]]:
+        """Get grid spacing for interior points."""
         raise NotImplementedError
     
 
 class Geometry1D(Geometry):
+    """Abstract base class for 1D geometric domains."""
+    
     @abstractmethod
     def length(self) -> float:
+        """Get the length of the 1D domain."""
         pass
     
     @abstractmethod
     def limits(self) -> Tuple[float, float]:
+        """Get the limits of the 1D domain."""
         pass
 
     def get_dimension(self) -> int:
+        """Get spatial dimension (1 for 1D domains)."""
         return 1
 
 
 class Geometry2D(Geometry):
-    @abstractmethod
-    def inside(self) -> bool:
-        pass
+    """Abstract base class for 2D geometric domains."""
     
     @abstractmethod
     def limits(self) -> Tuple[Tuple[float, float], Tuple[float, float]]:
+        """Get the limits of the 2D domain."""
         pass
     
     @abstractmethod
-    def grid_spacing_boundary(self) -> float:
+    def grid_spacing_boundary(self) -> Tuple[float, float]:
+        """Get grid spacing for boundary points."""
         pass
 
     def get_dimension(self) -> int:
+        """Get spatial dimension (2 for 2D domains)."""
         return 2
 
 
 class Interval(Geometry1D):
-    def __init__(self, x_left, x_right):
+    """1D interval domain [x_left, x_right]."""
+    
+    def __init__(self, x_left: float, x_right: float):
+        """Initialize 1D interval domain.
+        
+        Args:
+            x_left: Left boundary of the interval.
+            x_right: Right boundary of the interval.
         """
-        Parameters:
-            x_left (float): Left boundary.
-            x_right (float): Right boundary.
-        """
+        if x_left >= x_right:
+            raise ValueError("x_left must be less than x_right")
+            
         self.x_left = x_left
         self.x_right = x_right
-        self.spacing = None
+        self.spacing: Optional[float] = None
 
-        self.boundary_points = None
-        self.inners_points = None
+        self.boundary_points: Optional[torch.Tensor] = None
+        self.inners_points: Optional[torch.Tensor] = None
 
     def __str__(self) -> str:
+        """String representation of the interval."""
         return f"Interval({self.x_left}, {self.x_right})"
     
     def length(self) -> float:
-        """
-        Returns the length of the interval.
-        """
+        """Get the length of the interval."""
         return self.x_right - self.x_left
     
     def limits(self) -> Tuple[float, float]:
-        """
-        Returns the limits of the interval as a tuple.
-        """
+        """Get the limits of the interval as a tuple."""
         return (self.x_left, self.x_right)
     
-    def inside(self, x: Union[float, list, torch.Tensor]) -> Union[bool, torch.Tensor]:
-        """
-        Returns True if the point is inside the interval.
+    def inside(self, x: Union[float, List[float], torch.Tensor]) -> Union[bool, torch.Tensor]:
+        """Check if point(s) are inside the interval.
+        
+        Args:
+            x: Point(s) to check. Can be float, list, or tensor.
+            
+        Returns:
+            Boolean or tensor of booleans indicating if points are inside.
         """
         if isinstance(x, float):
             return (x >= self.x_left) & (x <= self.x_right)
-        elif isinstance(x, list) or isinstance(x, torch.Tensor):
+        elif isinstance(x, (list, torch.Tensor)):
+            if isinstance(x, list):
+                x = torch.tensor(x)
             return (x[0] >= self.x_left) & (x[0] <= self.x_right)
         else:
             raise TypeError("Unsupported type for x")
 
     def boundary(self, num_points: int, 
-                 device="cuda:0", random=False) -> torch.Tensor:
-        """
-        Set the boundary points.
-
-        Parameters:
-            num_points (int): Number of points to set.
-            device (str, optional): Device on which to set the points. Defaults to "cuda:0".
-            random (bool, optional): If True, set the points randomly. Defaults to False.
+                 device: str = "cuda:0", random: bool = False) -> torch.Tensor:
+        """Generate boundary points for the interval.
+        
+        Args:
+            num_points: Number of points to generate.
+            device: Device on which to create the points.
+            random: If True, generate points randomly (not used for 1D).
+            
+        Returns:
+            Tensor of boundary points.
         """
         x_boundary_right = torch.ones(int(num_points/2), device=device) * self.x_right
         x_boundary_left = torch.ones(int(num_points/2), device=device) * self.x_left
