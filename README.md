@@ -226,14 +226,12 @@ For questions and suggestions, please create issues in the repository.
 5. [**Implicit Neural Representations with Periodic Activation Functions (SIREN)**](https://arxiv.org/abs/2006.09661) -2020
 6. [**Automatic Differentiation in Machine Learning: a Survey**](https://arxiv.org/pdf/1502.05767.pdf) - 2018
 7. [**On the convergence of physics informed neural networks for linear second-order elliptic and parabolic type PDEs**](https://arxiv.org/pdf/2004.01806.pdf) - 2020
-8. [**Estimates on the generalization error of Physics Informed Neural Networks (PINNs) for approximating PDEs**]
-(https://arxiv.org/pdf/2006.16144.pdf) - 2023
+8. [**Estimates on the generalization error of Physics Informed Neural Networks (PINNs) for approximating PDEs**](https://arxiv.org/pdf/2006.16144.pdf) - 2023
 9. [Frequency Principle: Fourier Analysis Sheds Light On Deep Neural Networks](https://arxiv.org/pdf/1901.06523.pdf) - 2020
 10. [The Old and the New: Can Physics-Informed Deep-Learning Replace Traditional Linear Solvers?](https://arxiv.org/pdf/2103.09655.pdf) - 2021
 11. [Taylor-Mode Automatic Differentiation for Higher-Order Derivatives in JAX](https://openreview.net/pdf?id=SkxEF3FNPH) - 2019
 12. [Characterizing possible failure modes in physics-informed neural networks](https://arxiv.org/pdf/2109.01050.pdf) - 2021
-13. [Limitations of Physics Informed Machine Learning for Nonlinear Two-Phase Transport in Porous Media](https://www.researchgate.net/publication/
-343111185_Limitations_of_Physics_Informed_Machine_Learning_for_Nonlinear_Two-Phase_Transport_in_Porous_Media) - 2020
+13. [Limitations of Physics Informed Machine Learning for Nonlinear Two-Phase Transport in Porous Media](https://www.researchgate.net/publication/343111185_Limitations_of_Physics_Informed_Machine_Learning_for_Nonlinear_Two-Phase_Transport_in_Porous_Media) - 2020
 14. [Curriculum Learning: A Survey](https://arxiv.org/pdf/2101.10382.pdf) - 2022
 15. [Artificial Neural Network Method for Solution of Boundary Value Problems With Exact Satisfaction of Arbitrary Boundary Conditions](https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=5061501)
 16. [Neural-network methods for boundary value problems with irregular boundaries](https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=870037)
