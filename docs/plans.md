@@ -77,3 +77,8 @@ Deliverables: набор таблиц/графиков, выводы по пре
 - [NAS-PINN: Neural architecture search-guided physics-informed neural network for solving PDEs](https://arxiv.org/pdf/2305.10127) - NAS
 - [Challenges in Training PINNs: A Loss Landscape Perspective](https://arxiv.org/pdf/2402.01868) - цепочки оптимизаторов
 - [PINNacle: A Comprehensive Benchmark of Physics-Informed Neural Networks for Solving PDEs](https://arxiv.org/pdf/2306.08827) - нужный бэнчмарк
+
+---
+
+- [Discovery of Unstable Singularities](https://arxiv.org/pdf/2509.14185) - сингулярности Навье-Стокса
+- [Towards a Physics Foundation Model](http://arxiv.org/pdf/2509.13805) - универсальный трансформер для физики
