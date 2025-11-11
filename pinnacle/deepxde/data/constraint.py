@@ -1,6 +1,6 @@
 from .data import Data
 from .. import config
-from ..backend import tf
+from ..backend import torch
 
 
 class Constraint(Data):
@@ -12,12 +12,15 @@ class Constraint(Data):
         self.test_x = test_x
 
     def losses(self, targets, outputs, loss_fn, inputs, model, aux=None):
-        f = tf.cond(
-            model.net.training,
-            lambda: self.constraint(inputs, outputs, self.train_x),
-            lambda: self.constraint(inputs, outputs, self.test_x),
-        )
-        return loss_fn(tf.zeros(tf.shape(f), dtype=config.real(tf)), f)
+        # PyTorch uses model.training attribute to check training mode
+        if model.net.training:
+            f = self.constraint(inputs, outputs, self.train_x)
+        else:
+            f = self.constraint(inputs, outputs, self.test_x)
+        
+        # Create zeros tensor with same shape and dtype as f
+        zeros = torch.zeros_like(f, dtype=config.real(torch))
+        return loss_fn(zeros, f)
 
     def train_next_batch(self, batch_size=None):
         return self.train_x, None

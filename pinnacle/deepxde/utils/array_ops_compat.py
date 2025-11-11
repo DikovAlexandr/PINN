@@ -1,10 +1,10 @@
-"""Operations which handle numpy and tensorflow.compat.v1 automatically."""
+"""Operations which handle numpy and PyTorch automatically."""
 
 import numpy as np
 
 from .. import backend as bkd
 from .. import config
-from ..backend import is_tensor, tf
+from ..backend import is_tensor, torch
 
 
 def istensorlist(values):
@@ -14,10 +14,7 @@ def istensorlist(values):
 def convert_to_array(value):
     """Convert a list of numpy arrays or tensors to a numpy array or a tensor."""
     if istensorlist(value):
-        # TODO: use concat instead of stack as paddle now use shape [1,]
-        # for 0-D tensor, it will be solved soon.
-        if bkd.backend_name == "paddle":
-            return bkd.concat(value, axis=0)
+        # PyTorch backend uses stack
         return bkd.stack(value, axis=0)
     value = np.array(value)
     if value.dtype != config.real(np):
@@ -36,7 +33,7 @@ def hstack(tup):
 
 
 def roll(a, shift, axis):
-    return tf.roll(a, shift, axis) if is_tensor(a) else np.roll(a, shift, axis=axis)
+    return torch.roll(a, shift, axis) if is_tensor(a) else np.roll(a, shift, axis=axis)
 
 
 def zero_padding(array, pad_width):
@@ -50,5 +47,9 @@ def zero_padding(array, pad_width):
         )
         return indices, values, dense_shape
     if is_tensor(array):
-        return tf.pad(array, tf.constant(pad_width))
+        # PyTorch pad expects flattened tuple in reverse order
+        # numpy/tf pad_width: [(dim0_before, dim0_after), (dim1_before, dim1_after), ...]
+        # torch pad: (dimN_before, dimN_after, ..., dim0_before, dim0_after)
+        pad_flat = tuple(reversed([p for pair in pad_width for p in pair]))
+        return torch.nn.functional.pad(array, pad_flat)
     return np.pad(array, pad_width)

@@ -2,7 +2,7 @@ import numpy as np
 
 from .data import Data
 from .. import config
-from ..backend import tf
+from ..backend import torch
 from ..utils import run_if_any_none
 
 
@@ -31,14 +31,17 @@ class FuncConstraint(Data):
         if self.anchors is not None:
             n += len(self.anchors)
 
-        f = tf.cond(
-            model.net.training,
-            lambda: self.constraint(inputs, outputs, self.train_x),
-            lambda: self.constraint(inputs, outputs, self.test_x),
-        )
+        # PyTorch uses model.training attribute to check training mode
+        if model.net.training:
+            f = self.constraint(inputs, outputs, self.train_x)
+        else:
+            f = self.constraint(inputs, outputs, self.test_x)
+        
+        # Create zeros tensor with same shape and dtype as f
+        zeros = torch.zeros_like(f, dtype=config.real(torch))
         return [
             loss_fn(targets[:n], outputs[:n]),
-            loss_fn(tf.zeros(tf.shape(f), dtype=config.real(tf)), f),
+            loss_fn(zeros, f),
         ]
 
     @run_if_any_none("train_x", "train_y")

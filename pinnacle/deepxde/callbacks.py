@@ -6,7 +6,7 @@ import numpy as np
 from . import config
 from . import gradients as grad
 from . import utils
-from .backend import backend_name, tf, torch, paddle
+from .backend import backend_name, torch
 
 
 class Callback:
@@ -324,12 +324,8 @@ class VariableValue(Callback):
         self.epochs_since_last = 0
 
     def on_train_begin(self):
-        if backend_name == "tensorflow.compat.v1":
-            self.value = self.model.sess.run(self.var_list)
-        elif backend_name == "tensorflow":
-            self.value = [var.numpy() for var in self.var_list]
-        elif backend_name in ["pytorch", "paddle"]:
-            self.value = [var.detach().item() for var in self.var_list]
+        assert backend_name == "pytorch", f"Only PyTorch backend is supported, got: {backend_name}"
+        self.value = [var.detach().item() for var in self.var_list]
         print(
             self.model.train_state.epoch,
             utils.list_to_str(self.value, precision=self.precision),
@@ -377,21 +373,9 @@ class OperatorPredictor(Callback):
         self.epochs_since_last = 0
 
     def init(self):
-        if backend_name == "tensorflow.compat.v1":
-            self.tf_op = self.op(self.model.net.inputs, self.model.net.outputs)
-        elif backend_name == "tensorflow":
-
-            @tf.function
-            def op(inputs):
-                y = self.model.net(inputs)
-                return self.op(inputs, y)
-
-            self.tf_op = op
-        elif backend_name == "pytorch":
-            self.x = torch.as_tensor(self.x)
-            self.x.requires_grad_()
-        elif backend_name == "paddle":
-            self.x = paddle.to_tensor(self.x, stop_gradient=False)
+        assert backend_name == "pytorch", f"Only PyTorch backend is supported, got: {backend_name}"
+        self.x = torch.as_tensor(self.x)
+        self.x.requires_grad_()
 
     def on_train_begin(self):
         self.on_predict_end()
@@ -415,25 +399,10 @@ class OperatorPredictor(Callback):
             self.on_train_begin()
             
     def on_predict_end(self):
-        if backend_name == "tensorflow.compat.v1":
-            self.value = self.model.sess.run(
-                self.tf_op, feed_dict=self.model.net.feed_dict(False, self.x)
-            )
-        elif backend_name == "tensorflow":
-            self.value = utils.to_numpy(self.tf_op(self.x))
-        elif backend_name == "pytorch":
-            self.model.net.eval()
-            outputs = self.model.net(self.x)
-            self.value = utils.to_numpy(self.op(self.x, outputs))
-        elif backend_name == "paddle":
-            self.model.net.eval()
-            outputs = self.model.net(self.x)
-            self.value = utils.to_numpy(self.op(self.x, outputs))
-        else:
-            # TODO: other backends
-            raise NotImplementedError(
-                f"OperatorPredictor not implemented for backend {backend_name}."
-            )
+        assert backend_name == "pytorch", f"Only PyTorch backend is supported, got: {backend_name}"
+        self.model.net.eval()
+        outputs = self.model.net(self.x)
+        self.value = utils.to_numpy(self.op(self.x, outputs))
 
     def get_value(self):
         return self.value

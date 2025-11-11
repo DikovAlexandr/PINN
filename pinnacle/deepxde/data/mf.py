@@ -1,7 +1,6 @@
 import numpy as np
 
 from .data import Data
-from ..backend import tf
 from ..utils import run_if_any_none, standardize
 
 

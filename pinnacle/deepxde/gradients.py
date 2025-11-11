@@ -1,6 +1,7 @@
 __all__ = ["jacobian", "hessian"]
 
-from .backend import backend_name, tf, torch, jax, paddle
+from .backend import backend_name, torch
+# Note: Only PyTorch backend is supported
 
 
 class Jacobian:
@@ -18,15 +19,9 @@ class Jacobian:
         self.ys = ys
         self.xs = xs
 
-        if backend_name in ["tensorflow.compat.v1", "tensorflow", "pytorch", "paddle"]:
-            self.dim_y = ys.shape[1]
-        elif backend_name == "jax":
-            # For backend jax, a tuple of a jax array and a callable is passed as one of
-            # the arguments, since jax does not support computational graph explicitly.
-            # The array is used to control the dimensions and the callable is used to
-            # obtain the derivative function, which can be used to compute the
-            # derivatives.
-            self.dim_y = ys[0].shape[1]
+        # Only PyTorch backend is supported
+        assert backend_name == "pytorch", f"Only PyTorch backend is supported, got: {backend_name}"
+        self.dim_y = ys.shape[1]
         self.dim_x = xs.shape[1]
 
         self.J = {}
@@ -39,53 +34,16 @@ class Jacobian:
             raise ValueError("i={} is not valid.".format(i))
         if j is not None and not 0 <= j < self.dim_x:
             raise ValueError("j={} is not valid.".format(j))
-        # Compute J[i]
+        # Compute J[i] using PyTorch autograd
         if i not in self.J:
-            if backend_name in ["tensorflow.compat.v1", "tensorflow"]:
-                y = self.ys[:, i : i + 1] if self.dim_y > 1 else self.ys
-                self.J[i] = tf.gradients(y, self.xs)[0]
-            elif backend_name == "pytorch":
-                # TODO: retain_graph=True has memory leak?
-                y = self.ys[:, i : i + 1] if self.dim_y > 1 else self.ys
-                self.J[i] = torch.autograd.grad(
-                    y, self.xs, grad_outputs=torch.ones_like(y), create_graph=True
-                )[0]
-            elif backend_name == "paddle":
-                y = self.ys[:, i : i + 1] if self.dim_y > 1 else self.ys
-                self.J[i] = paddle.grad(y, self.xs, create_graph=True)[0]
-            elif backend_name == "jax":
-                # Here, we use jax.grad to compute the gradient of a function. This is
-                # different from TensorFlow and PyTorch that the input of a function is
-                # no longer a batch. Instead, it is a single point. Formally, backend
-                # jax computes gradients pointwisely and then vectorizes to batch, by
-                # jax.vmap. However, computationally, this is in fact done batchwisely
-                # and efficiently. It is very important to note that, without jax.vmap,
-                # this can only deal with functions whose output is a scalar and input
-                # is a single point.
-                # Other options are jax.jacrev + jax.vmap or jax.jacfwd + jax.vmap,
-                # which could be used to compute the full Jacobian matrix efficiently,
-                # if needed. Also, jax.vjp, jax.jvp will bring more flexibility and
-                # efficiency. jax.vjp + jax.vmap or jax.jvp + jax.vmap will be
-                # implemented in the future.
-                grad_fn = jax.grad(lambda x: self.ys[1](x)[i])
-                self.J[i] = (jax.vmap(grad_fn)(self.xs), grad_fn)
+            y = self.ys[:, i : i + 1] if self.dim_y > 1 else self.ys
+            self.J[i] = torch.autograd.grad(
+                y, self.xs, grad_outputs=torch.ones_like(y), create_graph=True
+            )[0]
 
-        if backend_name in ["tensorflow.compat.v1", "tensorflow", "pytorch", "paddle"]:
-            return (
-                self.J[i] if j is None or self.dim_x == 1 else self.J[i][:, j : j + 1]
-            )
-        if backend_name == "jax":
-            # Unlike other backends, in backend jax, a tuple of a jax array and a callable is returned, so that
-            # it is consistent with the argument, which is also a tuple. This may be useful for further computation,
-            # e.g. Hessian.
-            return (
-                self.J[i]
-                if j is None or self.dim_x == 1
-                else (
-                    self.J[i][0][:, j : j + 1],
-                    lambda inputs: self.J[i][1](inputs)[j : j + 1],
-                )
-            )
+        return (
+            self.J[i] if j is None or self.dim_x == 1 else self.J[i][:, j : j + 1]
+        )
 
 
 class Jacobians:
@@ -100,31 +58,9 @@ class Jacobians:
         self.Js = {}
 
     def __call__(self, ys, xs, i=0, j=None):
-        # For backend tensorflow and pytorch, self.Js cannot be reused across iteration.
-        # For backend pytorch, we need to reset self.Js in each iteration to avoid
-        # memory leak.
-        #
-        # For backend tensorflow, in each iteration, self.Js is reset to {}.
-        #
-        # Example:
-        #
-        # mydict = {}
-        #
-        # @tf.function
-        # def f(x):
-        #     tf.print(mydict)  # always {}
-        #     y = 1 * x
-        #     tf.print(hash(y.ref()), hash(x.ref()))  # Doesn't change
-        #     mydict[(y.ref(), x.ref())] = 1
-        #     tf.print(mydict)
-        #
-        # for _ in range(2):
-        #     x = np.random.random((3, 4))
-        #     f(x)
-        #
-        #
-        # For backend pytorch, in each iteration, ys and xs are new tensors
+        # For PyTorch backend, in each iteration, ys and xs are new tensors
         # converted from np.ndarray, so self.Js will increase over iteration.
+        # We need to reset self.Js in each iteration to avoid memory leak.
         #
         # Example:
         #
@@ -142,12 +78,8 @@ class Jacobians:
         #     x = torch.from_numpy(x)
         #     x.requires_grad_()
         #     f(x)
-        if backend_name in ["tensorflow.compat.v1", "tensorflow"]:
-            key = (ys.ref(), xs.ref())
-        elif backend_name in ["pytorch", "paddle"]:
-            key = (ys, xs)
-        elif backend_name == "jax":
-            key = (id(ys[0]), id(xs))
+        assert backend_name == "pytorch"
+        key = (ys, xs)
         if key not in self.Js:
             self.Js[key] = Jacobian(ys, xs)
         return self.Js[key](i, j)
@@ -200,10 +132,9 @@ class Hessian:
     """
 
     def __init__(self, y, xs, component=None, grad_y=None):
-        if backend_name in ["tensorflow.compat.v1", "tensorflow", "pytorch", "paddle"]:
-            dim_y = y.shape[1]
-        elif backend_name == "jax":
-            dim_y = y[0].shape[0]
+        # Only PyTorch backend is supported
+        assert backend_name == "pytorch", f"Only PyTorch backend is supported, got: {backend_name}"
+        dim_y = y.shape[1]
 
         if dim_y > 1:
             if component is None:
@@ -240,12 +171,9 @@ class Hessians:
         self.Hs = {}
 
     def __call__(self, y, xs, component=None, i=0, j=0, grad_y=None):
-        if backend_name in ["tensorflow.compat.v1", "tensorflow"]:
-            key = (y.ref(), xs.ref(), component)
-        elif backend_name in ["pytorch", "paddle"]:
-            key = (y, xs, component)
-        elif backend_name == "jax":
-            key = (id(y[0]), id(xs), component)
+        # Only PyTorch backend is supported
+        assert backend_name == "pytorch"
+        key = (y, xs, component)
         if key not in self.Hs:
             self.Hs[key] = Hessian(y, xs, component=component, grad_y=grad_y)
         return self.Hs[key](i, j)

@@ -13,14 +13,11 @@ also OK to skip some. The generated backend module has an ``is_enabled`` functio
 that returns whether the interface is supported by the framework or not.
 """
 
-# The backend currently being used
-# lib will be set to one of the following backends.
+# The backend currently being used (PyTorch only)
+# lib will be set to the PyTorch backend
 lib = None
-# All possible backends to use explicitly
-tf = None
+# PyTorch backend
 torch = None
-jax = None
-paddle = None
 
 ###############################################################################
 # Tensor, data type and context interfaces
@@ -44,14 +41,14 @@ def data_type_dict():
     module. The returned dictionary will become the attributes of the backend module.
 
     Examples:
-        >>> import tensorflow as tf
+        >>> import torch
         >>> def data_type_dict():
-        >>>     return {'float16': tf.float16, 'float32': tf.float32, ...}
+        >>>     return {'float16': torch.float16, 'float32': torch.float32, ...}
 
         After the module is initialized.
 
         >>> import backend as bkd
-        >>> bkd.float16  # this will point to tf.float16
+        >>> bkd.float16  # this will point to torch.float16
 
     Returns:
         dict of str to data type. The data type dict.

@@ -1,40 +1,38 @@
 from . import backend as bkd
 from . import config
-from .backend import tf
+from .backend import torch
 
 
 def mean_absolute_error(y_true, y_pred):
-    # TODO: pytorch
-    return tf.keras.losses.MeanAbsoluteError()(y_true, y_pred)
+    """Mean Absolute Error (MAE) - PyTorch implementation."""
+    return bkd.reduce_mean(bkd.abs(y_true - y_pred))
 
 
 def mean_absolute_percentage_error(y_true, y_pred):
-    # TODO: pytorch
-    return tf.keras.losses.MeanAbsolutePercentageError()(y_true, y_pred)
+    """Mean Absolute Percentage Error (MAPE) - PyTorch implementation."""
+    epsilon = 1e-10  # Small value to avoid division by zero
+    return bkd.reduce_mean(bkd.abs((y_true - y_pred) / (bkd.abs(y_true) + epsilon)))
 
 
 def mean_squared_error(y_true, y_pred):
-    # Warning:
-    # - Do not use ``tf.losses.mean_squared_error``, which casts `y_true` and `y_pred` to ``float32``.
-    # - Do not use ``tf.keras.losses.MSE``, which computes the mean value over the last dimension.
-    # - Do not use ``tf.keras.losses.MeanSquaredError()``, which casts loss to ``float32``
-    #     when calling ``compute_weighted_loss()`` calling ``scale_losses_by_sample_weight()``,
-    #     although it finally casts loss back to the original type.
+    """Mean Squared Error (MSE) - PyTorch implementation."""
     return bkd.reduce_mean(bkd.square(y_true - y_pred))
 
 
 def mean_l2_relative_error(y_true, y_pred):
+    """Mean L2 Relative Error - PyTorch implementation."""
     return bkd.reduce_mean(bkd.norm(y_true - y_pred, axis=1) / bkd.norm(y_true, axis=1))
 
 
 def softmax_cross_entropy(y_true, y_pred):
-    # TODO: pytorch
-    return tf.keras.losses.CategoricalCrossentropy(from_logits=True)(y_true, y_pred)
+    """Softmax Cross Entropy - PyTorch implementation."""
+    # PyTorch expects logits as input for cross entropy
+    return torch.nn.functional.cross_entropy(y_pred, y_true)
 
 
 def zero(*_):
-    # TODO: pytorch
-    return tf.constant(0, dtype=config.real(tf))
+    """Zero loss - PyTorch implementation."""
+    return torch.tensor(0.0, dtype=config.real(torch))
 
 
 LOSS_DICT = {

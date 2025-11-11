@@ -1,6 +1,6 @@
 from .. import backend as bkd
 from .. import config
-from ..backend import backend_name, tf
+from ..backend import backend_name, torch
 
 
 def linear(x):
@@ -24,11 +24,11 @@ def layer_wise_locally_adaptive(activation, n=1):
         functions with slope recovery for deep and physics-informed neural networks.
         Proceedings of the Royal Society A, 476(2239), 20200334, 2020
         <https://doi.org/10.1098/rspa.2020.0334>`_.
+    
+    Note: PyTorch backend implementation. The scaling parameter is trainable.
     """
-    # TODO: other backends
-    if backend_name != "tensorflow.compat.v1":
-        raise NotImplementedError("Only tensorflow.compat.v1 backend supports L-LAAF.")
-    a = tf.Variable(1 / n, dtype=config.real(tf))
+    assert backend_name == "pytorch", f"Only PyTorch backend is supported, got: {backend_name}"
+    a = torch.nn.Parameter(torch.tensor(1.0 / n, dtype=config.real(torch)))
     return lambda x: activation(n * a * x)
 
 
