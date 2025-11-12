@@ -6,6 +6,7 @@ __all__ = [
     "Disk",
     "Geometry",
     "GeometryXTime",
+    "GoodLatticeSampler",
     "Hypercube",
     "Hypersphere",
     "Interval",
@@ -16,6 +17,7 @@ __all__ = [
     "TimeDomain",
     "Triangle",
     "sample",
+    "sample_glt",
 ]
 
 from .csg import CSGDifference, CSGIntersection, CSGUnion
@@ -24,6 +26,7 @@ from .geometry_1d import Interval
 from .geometry_2d import Disk, Polygon, Rectangle, Triangle
 from .geometry_3d import Cuboid, Sphere
 from .geometry_nd import Hypercube, Hypersphere
+from .glt import GoodLatticeSampler
 from .pointcloud import PointCloud
-from .sampler import sample
+from .sampler import sample, sample_glt
 from .timedomain import GeometryXTime, TimeDomain
