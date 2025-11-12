@@ -8,6 +8,16 @@ from .external import *
 from .internal import *
 from ..backend import backend_name
 
+# GPU utilities (simple and efficient)
+from . import gpu_utils
+from .gpu_utils import (
+    get_optimal_device,
+    get_gpu_memory_info,
+    clear_gpu_cache,
+    gpu_memory_context,
+    estimate_tensor_memory,
+)
+
 
 def _load_backend(mod_name):
     mod = importlib.import_module(".%s" % mod_name, __name__)
