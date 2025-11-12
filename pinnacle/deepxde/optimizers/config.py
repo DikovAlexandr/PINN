@@ -1,9 +1,10 @@
-__all__ = ["set_LBFGS_options"]
+__all__ = ["set_LBFGS_options", "set_Muon_options"]
 
 from ..backend import backend_name
 
 
 LBFGS_options = {}
+Muon_options = {}
 
 
 def set_LBFGS_options(
@@ -60,6 +61,65 @@ def set_LBFGS_options(
 
 
 set_LBFGS_options()
+
+
+def set_Muon_options(
+    momentum=0.95,
+    nesterov=True,
+    ns_coefficients=(3.4445, -4.775, 2.0315),
+    eps=1e-07,
+    ns_steps=5,
+):
+    """Sets the hyperparameters of Muon optimizer.
+
+    Muon is a momentum-based optimizer with Newton-Schulz preconditioner,
+    designed for efficient training of neural networks.
+
+    Reference:
+        PyTorch Muon optimizer: `torch.optim.Muon <https://pytorch.org/docs/stable/generated/torch.optim.Muon.html>`_
+
+    Args:
+        momentum (float): Momentum factor (default: 0.95).
+            Controls the exponential moving average of gradients.
+        nesterov (bool): Whether to use Nesterov momentum (default: True).
+            Nesterov momentum provides better convergence in many cases.
+        ns_coefficients (tuple): Coefficients for Newton-Schulz iteration (default: (3.4445, -4.775, 2.0315)).
+            These coefficients control the Newton-Schulz preconditioner computation.
+        eps (float): Small value for numerical stability (default: 1e-07).
+            Prevents division by zero in computations.
+        ns_steps (int): Number of Newton-Schulz iteration steps (default: 5).
+            More steps can improve convergence but increase computational cost.
+
+    Example:
+        .. code-block:: python
+
+            import deepxde as dde
+            
+            # Use default Muon settings
+            model.compile("muon", lr=0.001)
+            
+            # Or customize Muon settings
+            dde.optimizers.set_Muon_options(momentum=0.9, ns_steps=3)
+            model.compile("muon", lr=0.001)
+
+    Note:
+        - Muon is particularly effective for large-scale neural network training
+        - The learning rate (lr) and weight_decay are set during model.compile()
+        - Higher ns_steps may improve convergence but slow down training
+        - **IMPORTANT**: Muon only works with 2D parameters (weight matrices).
+          For neural networks with bias terms (1D parameters), the system will
+          automatically apply Muon to weights and Adam to biases in a hybrid approach.
+          For best performance with Muon, consider using networks without bias terms.
+    """
+    global Muon_options
+    Muon_options["momentum"] = momentum
+    Muon_options["nesterov"] = nesterov
+    Muon_options["ns_coefficients"] = ns_coefficients
+    Muon_options["eps"] = eps
+    Muon_options["ns_steps"] = ns_steps
+
+
+set_Muon_options()
 
 
 # Backend-dependent options

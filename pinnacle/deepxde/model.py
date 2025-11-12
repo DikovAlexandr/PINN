@@ -268,7 +268,11 @@ class Model:
         # NOTE: edited
         self.model_save_path = model_save_path
         self.display_every = display_every
-        print(f"PDE Class Name: {type(self.pde).__name__}")
+        # Print data type (if available)
+        if hasattr(self.data, 'pde'):
+            print(f"PDE Function: {type(self.data.pde).__name__}")
+        else:
+            print(f"Data type: {type(self.data).__name__}")
 
         if model_restore_path is not None:
             self.restore(model_restore_path, verbose=1)

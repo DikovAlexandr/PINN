@@ -1,8 +1,78 @@
-__all__ = ["get", "is_external_optimizer"]
+__all__ = ["get", "is_external_optimizer", "HybridMuonAdam"]
 
 import torch
 
-from ..config import LBFGS_options
+from ..config import LBFGS_options, Muon_options
+
+
+class HybridMuonAdam(torch.optim.Optimizer):
+    """Hybrid optimizer that applies Muon to 2D parameters and Adam to 1D parameters.
+    
+    This is necessary because Muon only supports 2D parameters (weight matrices),
+    while neural networks often have 1D parameters (biases).
+    """
+    
+    def __init__(self, params, lr, weight_decay, muon_options):
+        """
+        Args:
+            params: List of parameters to optimize
+            lr: Learning rate
+            weight_decay: Weight decay coefficient
+            muon_options: Dictionary of Muon-specific options
+        """
+        # Separate parameters by dimensionality BEFORE calling super().__init__
+        muon_params = []
+        adam_params = []
+        
+        # Convert params to list if it's a generator
+        params_list = list(params)
+        
+        for p in params_list:
+            if p.ndim >= 2:
+                muon_params.append(p)
+            else:
+                adam_params.append(p)
+        
+        # Initialize parent with all params
+        defaults = dict(lr=lr, weight_decay=weight_decay)
+        super().__init__(params_list, defaults)
+        
+        # Create separate optimizers
+        if len(muon_params) > 0:
+            self.muon = torch.optim.Muon(
+                muon_params,
+                lr=lr,
+                weight_decay=weight_decay,
+                momentum=muon_options["momentum"],
+                nesterov=muon_options["nesterov"],
+                ns_coefficients=muon_options["ns_coefficients"],
+                eps=muon_options["eps"],
+                ns_steps=muon_options["ns_steps"],
+            )
+        else:
+            self.muon = None
+            
+        if len(adam_params) > 0:
+            self.adam = torch.optim.Adam(adam_params, lr=lr, weight_decay=weight_decay)
+        else:
+            self.adam = None
+    
+    def step(self, closure=None):
+        """Perform a single optimization step."""
+        loss = None
+        if self.muon is not None:
+            loss = self.muon.step(closure)
+        if self.adam is not None:
+            # For Adam, we only call closure once (already called by Muon)
+            loss = self.adam.step(None)
+        return loss
+    
+    def zero_grad(self, set_to_none=False):
+        """Zero out the gradients."""
+        if self.muon is not None:
+            self.muon.zero_grad(set_to_none=set_to_none)
+        if self.adam is not None:
+            self.adam.zero_grad(set_to_none=set_to_none)
 
 
 # NOTE: edited
@@ -45,6 +115,36 @@ def get(params, optimizer, learning_rate=None, decay=None, weight_decay=0):
             if weight_decay == 0:
                 raise ValueError("AdamW optimizer requires non-zero weight decay")
             optim = torch.optim.AdamW(params, lr=learning_rate, weight_decay=weight_decay)
+        elif optimizer == "muon":
+            # Muon optimizer with Newton-Schulz preconditioner
+            # NOTE: Muon only supports 2D parameters (weight matrices)
+            # Use HybridMuonAdam to handle both 2D (weights) and 1D (biases) parameters
+            muon_params = [p for p in params if p.ndim >= 2]
+            adam_params = [p for p in params if p.ndim < 2]
+            
+            if len(muon_params) == 0:
+                raise ValueError(
+                    "Muon optimizer requires at least one 2D parameter (weight matrix). "
+                    "Consider using a network with weight matrices or switch to another optimizer."
+                )
+            
+            if len(adam_params) > 0:
+                print(f"Note: Using hybrid optimizer - Muon for {len(muon_params)} 2D parameters (weights), "
+                      f"Adam for {len(adam_params)} 1D parameters (biases)")
+                optim = HybridMuonAdam(params, learning_rate, weight_decay, Muon_options)
+            else:
+                # All parameters are 2D, use pure Muon
+                print(f"Using Muon for all {len(muon_params)} 2D parameters")
+                optim = torch.optim.Muon(
+                    params,
+                    lr=learning_rate,
+                    weight_decay=weight_decay,
+                    momentum=Muon_options["momentum"],
+                    nesterov=Muon_options["nesterov"],
+                    ns_coefficients=Muon_options["ns_coefficients"],
+                    eps=Muon_options["eps"],
+                    ns_steps=Muon_options["ns_steps"],
+                )
         else:
             raise NotImplementedError(f"{optimizer} to be implemented for backend pytorch.")
     lr_scheduler = _get_learningrate_scheduler(optim, decay)
