@@ -37,7 +37,7 @@ def train_process(data, save_path, device, seed):
     import torch
     import deepxde as dde
     torch.cuda.set_device(device)
-    torch.set_default_tensor_type(torch.cuda.FloatTensor)
+    torch.set_default_dtype(torch.cuda.float32)
     dde.config.set_default_float('float32')
     dde.config.set_random_seed(seed)
 
@@ -77,9 +77,9 @@ class Trainer:
         if self.device[0] != 'cpu':
             device = "cuda:" + self.device[0]
             torch.cuda.set_device(device)
-            torch.set_default_tensor_type(torch.cuda.FloatTensor)
+            torch.set_default_dtype(torch.cuda.float32)
         else:
-            torch.set_default_tensor_type(torch.FloatTensor)
+            torch.set_default_dtype(torch.float32)
         dde.config.set_default_float('float32')
 
         for j in range(self.repeat):
