@@ -1,8 +1,9 @@
-__all__ = ["get", "is_external_optimizer", "HybridMuonAdam"]
+__all__ = ["get", "is_external_optimizer", "HybridMuonAdam", "GeneticAlgorithm"]
 
 import torch
 
-from ..config import LBFGS_options, Muon_options
+from ..config import LBFGS_options, Muon_options, GA_options
+from .genetic import GeneticAlgorithm
 
 
 class HybridMuonAdam(torch.optim.Optimizer):
@@ -77,9 +78,10 @@ class HybridMuonAdam(torch.optim.Optimizer):
 
 # NOTE: edited
 def is_external_optimizer(optimizer):
+    """Check if optimizer requires special handling (closure-based)."""
     if isinstance(optimizer, torch.optim.Optimizer):
-        return isinstance(optimizer, torch.optim.LBFGS)
-    return optimizer in ["L-BFGS", "L-BFGS-B"]
+        return isinstance(optimizer, (torch.optim.LBFGS, GeneticAlgorithm))
+    return optimizer in ["L-BFGS", "L-BFGS-B", "genetic", "ga"]
 
 
 def get(params, optimizer, learning_rate=None, decay=None, weight_decay=0):
@@ -145,6 +147,21 @@ def get(params, optimizer, learning_rate=None, decay=None, weight_decay=0):
                     eps=Muon_options["eps"],
                     ns_steps=Muon_options["ns_steps"],
                 )
+        elif optimizer in ["genetic", "ga"]:
+            # Genetic Algorithm optimizer (gradient-free evolutionary optimization)
+            print(f"Using Genetic Algorithm optimizer (population={GA_options['population_size']})")
+            optim = GeneticAlgorithm(
+                params,
+                lr=learning_rate,  # Used as mutation scale multiplier
+                population_size=GA_options["population_size"],
+                mutation_rate=GA_options["mutation_rate"],
+                mutation_scale=GA_options["mutation_scale"],
+                crossover_rate=GA_options["crossover_rate"],
+                selection_method=GA_options["selection_method"],
+                tournament_size=GA_options["tournament_size"],
+                elitism=GA_options["elitism"],
+                generations_per_step=GA_options["generations_per_step"],
+            )
         else:
             raise NotImplementedError(f"{optimizer} to be implemented for backend pytorch.")
     lr_scheduler = _get_learningrate_scheduler(optim, decay)

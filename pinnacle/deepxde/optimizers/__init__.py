@@ -1,7 +1,11 @@
 import importlib
 import sys
 
-from .config import LBFGS_options, set_LBFGS_options, Muon_options, set_Muon_options
+from .config import (
+    LBFGS_options, set_LBFGS_options,
+    Muon_options, set_Muon_options,
+    GA_options, set_GA_options
+)
 from ..backend import backend_name
 
 

@@ -168,7 +168,19 @@ class Model:
         def train_step(inputs, targets):
             # NOTE: edited
             def closure(*, skip_backward=False):
-                losses = outputs_losses_train(inputs, targets)[1]
+                # For GA: ensure inputs are freshly converted to tensors with gradients
+                # This is important because GA changes network parameters between evaluations
+                if isinstance(inputs, tuple):
+                    fresh_inputs = tuple(map(lambda x: torch.as_tensor(x), inputs))
+                else:
+                    fresh_inputs = torch.as_tensor(inputs)
+                
+                if isinstance(targets, (list, tuple, type(None))):
+                    fresh_targets = targets
+                else:
+                    fresh_targets = torch.as_tensor(targets) if targets is not None else None
+                
+                losses = outputs_losses_train(fresh_inputs, fresh_targets)[1]
                 self.opt.losses = losses
                 total_loss = torch.sum(losses)
                 if not skip_backward:
@@ -284,16 +296,24 @@ class Model:
         self._test()
         self.callbacks.on_train_begin()
         if optimizers.is_external_optimizer(self.opt_name):
-            # NOTE: edited
+            # NOTE: edited - external optimizers (LBFGS, GA) use closure
             logger = logging.getLogger(__name__)
-            if iterations is not None:
-                logger.warning("The number of iterations is ignored for external optimizer.")
             if batch_size is not None:
                 logger.warning("The batch size is ignored for external optimizer.")
 
             # Only PyTorch backend is supported
             assert backend_name == "pytorch"
-            self._train_pytorch_lbfgs()
+            
+            # Check optimizer type
+            if self.opt_name in ["L-BFGS", "L-BFGS-B"] or isinstance(self.opt, torch.optim.LBFGS):
+                if iterations is not None:
+                    logger.warning("The number of iterations is ignored for L-BFGS optimizer.")
+                self._train_pytorch_lbfgs()
+            elif self.opt_name in ["genetic", "ga"] or isinstance(self.opt, optimizers.GeneticAlgorithm):
+                # GA uses iterations as generations
+                if iterations is None:
+                    iterations = 100  # Default generations
+                self._train_genetic_algorithm(iterations, display_every)
         else:
             if iterations is None:
                 raise ValueError("No iterations for {}.".format(self.opt_name))
@@ -331,6 +351,7 @@ class Model:
                 break
 
     def _train_pytorch_lbfgs(self):
+        """Training with L-BFGS optimizer."""
         prev_n_iter = 0
         while prev_n_iter < optimizers.LBFGS_options["maxiter"]:
             self.callbacks.on_epoch_begin()
@@ -352,6 +373,46 @@ class Model:
             self.train_state.step += n_iter - prev_n_iter
             prev_n_iter = n_iter
             self._test()
+
+            self.callbacks.on_batch_end()
+            self.callbacks.on_epoch_end()
+
+            if self.stop_training:
+                break
+    
+    def _train_genetic_algorithm(self, generations, display_every):
+        """Training with Genetic Algorithm optimizer."""
+        print(f"Training with Genetic Algorithm for {generations} generations")
+        print(f"Population size: {self.opt.population_size}")
+        print()
+        
+        for generation in range(generations):
+            self.callbacks.on_epoch_begin()
+            self.callbacks.on_batch_begin()
+
+            # GA evaluates entire population on full dataset
+            self.train_state.set_data_train(*self.data.train_next_batch(self.batch_size))
+            
+            # Perform GA step (evolves population)
+            self._train_step(
+                self.train_state.X_train,
+                self.train_state.y_train,
+                self.train_state.train_aux_vars,
+            )
+
+            self.train_state.epoch += 1
+            self.train_state.step += 1
+            
+            # Test and display
+            self._test()
+            
+            if self.train_state.epoch % display_every == 0 or generation == generations - 1:
+                # Display GA statistics
+                stats = self.opt.get_statistics()
+                display.training_display(self.train_state)
+                print(f"GA Generation: {stats['generation']}, "
+                      f"Best Fitness: {stats['best_fitness']:.6e}, "
+                      f"Population: {stats['population_size']}")
 
             self.callbacks.on_batch_end()
             self.callbacks.on_epoch_end()
