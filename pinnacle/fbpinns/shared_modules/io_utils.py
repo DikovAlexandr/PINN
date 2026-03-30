@@ -1,60 +1,67 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+"""FBPINNs helper I/O utilities (vendored).
+
+This module provides small filesystem helpers used by `constantsBase.py`.
+It intentionally keeps behavior conservative to avoid accidentally deleting
+the current working directory.
 """
-Created on Wed Mar 10 15:10:09 2021
 
-@author: bmoseley
-"""
+from __future__ import annotations
 
-# This module contains helper I/O functions
-
+import glob
 import os
 import shutil
-import glob
+from typing import Iterable
 
 
-def get_dir(directory):
-    """
-    Creates the given directory if it does not exist.
-    """
-    if not os.path.exists(directory):
-        os.makedirs(directory)
+_DANGEROUS_DIR_NAMES = {"..", ".", "", "/", "./", "../", "*"}
+
+
+def get_dir(directory: str) -> str:
+    """Create `directory` if it does not exist, and return it."""
+    os.makedirs(directory, exist_ok=True)
     return directory
 
-def clear_dir(directory):
-    """
-    Removes all files in the given directory.
-    """
-    # important! if None passed to os.listdir, current directory is wiped (!)
-    if not os.path.isdir(directory): raise Exception("%s is not a directory"%(directory))
-    if type(directory) != str: raise Exception("string type required for directory: %s"%(directory))
-    if directory in ["..",".", "","/","./","../","*"]: raise Exception("trying to delete current directory, probably bad idea?!")
-    
-    for f in os.listdir(directory):
-        path = os.path.join(directory, f)
+
+def clear_dir(directory: str) -> None:
+    """Remove all files/subdirectories inside `directory` (but keep the directory)."""
+    # Important: if None passed to os.listdir, current directory is wiped.
+    if not isinstance(directory, str):
+        raise TypeError(f"directory must be str, got {type(directory)!r}")
+    if not os.path.isdir(directory):
+        raise NotADirectoryError(f"{directory} is not a directory")
+    if directory in _DANGEROUS_DIR_NAMES:
+        raise ValueError(
+            "Refusing to clear a dangerous directory name: " f"{directory!r}"
+        )
+
+    for entry in os.listdir(directory):
+        path = os.path.join(directory, entry)
         try:
             if os.path.isfile(path):
                 os.remove(path)
             elif os.path.isdir(path):
                 shutil.rmtree(path)
-        except Exception as e:
-            print(e)
+        except Exception as exc:
+            # Best-effort cleanup; keep legacy behavior of printing.
+            print(exc)
 
-def clear_files(glob_expression):
-    """
-    Removes all files matching glob expression.
-    """
-    for f in glob.glob(glob_expression): 
-        if os.path.isfile(f):
-            os.remove(f)
 
-def remove_dir(directory):
-    """
-    Recursively removes directory.
-    """
-    # important!
-    if not os.path.isdir(directory): raise Exception("%s is not a directory"%(directory))
-    if type(directory) != str: raise Exception("string type required for directory: %s"%(directory))
-    if directory in ["..",".", "","/","./","../", "*"]: raise Exception("trying to delete current directory, probably bad idea?!")
-    
+def clear_files(glob_expression: str) -> None:
+    """Remove all files matching `glob_expression`."""
+    for path in glob.glob(glob_expression):
+        if os.path.isfile(path):
+            os.remove(path)
+
+
+def remove_dir(directory: str) -> None:
+    """Recursively remove `directory`."""
+    if not isinstance(directory, str):
+        raise TypeError(f"directory must be str, got {type(directory)!r}")
+    if not os.path.isdir(directory):
+        raise NotADirectoryError(f"{directory} is not a directory")
+    if directory in _DANGEROUS_DIR_NAMES:
+        raise ValueError(
+            "Refusing to remove a dangerous directory name: " f"{directory!r}"
+        )
+
     shutil.rmtree(directory)

@@ -9,6 +9,12 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# FBPINNs (vendored) runtime artifacts
+fbpinns/results/
+fbpinns/benchmark_results/
+fbpinns/interpolate_cache/
+fbpinns/screenlog.*.log
+
 # C extensions
 *.so
 

@@ -1,0 +1,62 @@
+***** Begin #0-0 *****
+PDE Class Name: FBPINNS_Burgers1D
+Seed: 385399040
+RUN: pinnacle_2x1_Burgers1D_64h_4l_90b_0.6w
+P: <burger.Burgers1D object at 0x0000025C0C7427B0>
+SUBDOMAIN_XS: [array([-1.,  0.,  1.]), array([0., 1.])]
+SUBDOMAIN_WS: [array([0.6, 0.6, 0.6]), array([0.6, 0.6])]
+BOUNDARY_N: (1,)
+Y_N: (0, 1)
+ACTIVE_SCHEDULER: <class 'training.active_schedulers.AllActiveSchedulerND'>
+ACTIVE_SCHEDULER_ARGS: ()
+DEVICE: cpu
+MODEL: <class 'models.models.FCN'>
+N_HIDDEN: 64
+N_LAYERS: 4
+BATCH_SIZE: (90, 90)
+RANDOM: False
+LRATE: 0.001
+BOUNDARY_WEIGHT: 100
+BOUNDARY_BATCH_SIZE: 2025
+DATALOSS_WEIGHT: 1
+N_STEPS: 50
+SEED: 385399040
+BATCH_SIZE_TEST: (100, 100)
+BOUNDARY_BATCH_SIZE_TEST: 2500
+PLOT_LIMS: (1.1, False)
+SUMMARY_FREQ: 10
+TEST_FREQ: 10
+MODEL_SAVE_FREQ: 10000
+SHOW_FIGURES: False
+SAVE_FIGURES: True
+CLEAR_OUTPUT: False
+RESULTS_ROOT: C:\Users\alex\Documents\GitHub\PINN\runs\01.20-12.09.36-fbpinns_benchmark-fbpinns-fbpinn\0-0\fbpinns_results\
+BENCHMARK_RESULTS_ROOT: C:\Users\alex\Documents\GitHub\PINN\runs\01.20-12.09.36-fbpinns_benchmark-fbpinns-fbpinn\0-0\fbpinns_benchmark_results\
+SUMMARY_OUT_DIR: C:\Users\alex\Documents\GitHub\PINN\runs\01.20-12.09.36-fbpinns_benchmark-fbpinns-fbpinn\0-0\fbpinns_results\summaries\pinnacle_2x1_Burgers1D_64h_4l_90b_0.6w\
+MODEL_OUT_DIR: C:\Users\alex\Documents\GitHub\PINN\runs\01.20-12.09.36-fbpinns_benchmark-fbpinns-fbpinn\0-0\fbpinns_results\models\pinnacle_2x1_Burgers1D_64h_4l_90b_0.6w\
+HOSTNAME: win-4c7rjmr7oid
+Device: cpu
+Main thread ID: 15732
+Torch seed:  385399040
+0 Active updated:
+ [[1]
+ [1]]
+[i: 10/50] loss: 0.8352 rate: 6.6 elapsed: 0.00 hr 2026-01-20 09:09:42 pinnacle_2x1_Burgers1D_64h_4l_90b_0.6w
+
+torch.Size([10000, 2]) torch.Size([10000, 1]) torch.Size([10000, 1])
+[i: 20/50] loss: 0.4615 rate: 8.4 elapsed: 0.00 hr 2026-01-20 09:09:48 pinnacle_2x1_Burgers1D_64h_4l_90b_0.6w
+
+torch.Size([10000, 2]) torch.Size([10000, 1]) torch.Size([10000, 1])
+[i: 30/50] loss: 0.3997 rate: 8.5 elapsed: 0.00 hr 2026-01-20 09:09:54 pinnacle_2x1_Burgers1D_64h_4l_90b_0.6w
+
+torch.Size([10000, 2]) torch.Size([10000, 1]) torch.Size([10000, 1])
+[i: 40/50] loss: 0.4188 rate: 8.7 elapsed: 0.01 hr 2026-01-20 09:10:00 pinnacle_2x1_Burgers1D_64h_4l_90b_0.6w
+
+torch.Size([10000, 2]) torch.Size([10000, 1]) torch.Size([10000, 1])
+[i: 50/50] loss: 0.3655 rate: 7.8 elapsed: 0.01 hr 2026-01-20 09:10:06 pinnacle_2x1_Burgers1D_64h_4l_90b_0.6w
+
+torch.Size([10000, 2]) torch.Size([10000, 1]) torch.Size([10000, 1])
+Finished training
+Epoch 50: saving model to C:\Users\alex\Documents\GitHub\PINN\runs\01.20-12.09.36-fbpinns_benchmark-fbpinns-fbpinn\0-0/50.pt ...
+'train' took 31.072547 s
+*****  End #0-0  *****

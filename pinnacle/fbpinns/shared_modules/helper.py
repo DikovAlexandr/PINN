@@ -1,55 +1,57 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Wed Mar 10 15:10:09 2021
+"""FBPINNs helper utilities (vendored).
 
-@author: bmoseley
+This file is used by multiple FBPINNs modules. Keep API stable.
 """
 
-# This module contains generic helper functions
+from __future__ import annotations
 
 import copy as python_copy
-import time
 import functools
+import time
+from typing import Any, Callable, List
+
 import torch
 
-# Helper functions
-    
 
-def recursive_list_map(f, l):
-    "Recursively map a function f to a list"
-    return [recursive_list_map(f, x) if isinstance(x, list) else f(x) for x in l]
-
+def recursive_list_map(func: Callable[[Any], Any], items: List[Any]) -> List[Any]:
+    """Recursively map `func` over nested lists."""
+    return [
+        recursive_list_map(func, x) if isinstance(x, list) else func(x)
+        for x in items
+    ]
 
 
 # Helper classes
 
-class cache_x(object):
+class cache_x:
+    """Cache decorator for functions taking a torch tensor `x` as input.
+
+    Inputs are treated as equal if they are close under `torch.norm(x - x_) < eps`.
     """
-    Cache func return values, "isclose" inputs are seen as one input.
-    Inputs are torch.tensors
-    No maximum cache size (keeps growing)
-    """
-    def __init__(self, eps=1e-3, maxsize=100):
+
+    def __init__(self, eps: float = 1e-3, maxsize: int = 100):
         self.eps = eps
         self.maxsize = maxsize
-        self.cache_dict = dict()
-    def isclose(self, x, x_):
-        return x.shape==x_.shape and torch.norm(x-x_) < self.eps
+        self.cache_dict: dict[torch.Tensor, Any] = {}
+
+    def isclose(self, x: torch.Tensor, x_: torch.Tensor) -> bool:
+        return x.shape == x_.shape and torch.norm(x - x_) < self.eps
+
     def __call__(self, func):
         @functools.wraps(func)
-        def wrapped_func(_,x):
+        def wrapped_func(_, x):
             v = None
-            for x_,v_ in self.cache_dict.items():
+            for x_, v_ in self.cache_dict.items():
                 if self.isclose(x, x_):
                     v = v_
                     break
-            if v == None:
-                v = func(_,x)
+            if v is None:
+                v = func(_, x)
                 self.cache_dict[x] = v
-            if len(self.cache_dict)>self.maxsize:
+            if len(self.cache_dict) > self.maxsize:
                 self.cache_dict.clear()
             return v
+
         return wrapped_func
 
 class DictToObj:
@@ -107,8 +109,8 @@ if __name__ == "__main__":
     d["a"][0]=10
     print(a,b)
     
-    l = [1,2,3, [1,2,3], [5,6, [7,8]]]
-    a = recursive_list_map(lambda x: x+1, l)
+    l = [1, 2, 3, [1, 2, 3], [5, 6, [7, 8]]]
+    a = recursive_list_map(lambda x: x + 1, l)
     print(a)
     
     with Timer(verbose=True) as timer:
@@ -118,6 +120,3 @@ if __name__ == "__main__":
     with Timer("test") as timer:
         time.sleep(1)
     print(timer.interval)
-    
-    
-    

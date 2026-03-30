@@ -1,0 +1,34 @@
+RUN: pinnacle_2x1_Burgers1D_64h_4l_90b_0.6w
+P: <burger.Burgers1D object at 0x000001C4F841E660>
+SUBDOMAIN_XS: [array([-1.,  0.,  1.]), array([0., 1.])]
+SUBDOMAIN_WS: [array([0.6, 0.6, 0.6]), array([0.6, 0.6])]
+BOUNDARY_N: (1,)
+Y_N: (0, 1)
+ACTIVE_SCHEDULER: <class 'training.active_schedulers.AllActiveSchedulerND'>
+ACTIVE_SCHEDULER_ARGS: ()
+DEVICE: cpu
+MODEL: <class 'models.models.FCN'>
+N_HIDDEN: 64
+N_LAYERS: 4
+BATCH_SIZE: (90, 90)
+RANDOM: False
+LRATE: 0.001
+BOUNDARY_WEIGHT: 100
+BOUNDARY_BATCH_SIZE: 2025
+DATALOSS_WEIGHT: 1
+N_STEPS: 50
+SEED: 349682849
+BATCH_SIZE_TEST: (100, 100)
+BOUNDARY_BATCH_SIZE_TEST: 2500
+PLOT_LIMS: (1.1, False)
+SUMMARY_FREQ: 50
+TEST_FREQ: 50
+MODEL_SAVE_FREQ: 10000
+SHOW_FIGURES: False
+SAVE_FIGURES: True
+CLEAR_OUTPUT: False
+RESULTS_ROOT: C:\Users\alex\Documents\GitHub\PINN\runs\01.14-18.08.42-fbpinns_benchmark-fbpinns-fbpinn\0-0\fbpinns_results\
+BENCHMARK_RESULTS_ROOT: C:\Users\alex\Documents\GitHub\PINN\runs\01.14-18.08.42-fbpinns_benchmark-fbpinns-fbpinn\0-0\fbpinns_benchmark_results\
+SUMMARY_OUT_DIR: C:\Users\alex\Documents\GitHub\PINN\runs\01.14-18.08.42-fbpinns_benchmark-fbpinns-fbpinn\0-0\fbpinns_results\summaries\pinnacle_2x1_Burgers1D_64h_4l_90b_0.6w\
+MODEL_OUT_DIR: C:\Users\alex\Documents\GitHub\PINN\runs\01.14-18.08.42-fbpinns_benchmark-fbpinns-fbpinn\0-0\fbpinns_results\models\pinnacle_2x1_Burgers1D_64h_4l_90b_0.6w\
+HOSTNAME: win-4c7rjmr7oid

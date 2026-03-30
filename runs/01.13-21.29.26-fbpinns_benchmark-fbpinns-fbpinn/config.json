@@ -1,0 +1,10 @@
+{
+    "seed": null,
+    "repeat": 1,
+    "net": "fbpinn",
+    "cases": [
+        "Burgers1D"
+    ],
+    "n_steps": 100,
+    "device": "cpu"
+}

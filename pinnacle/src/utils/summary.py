@@ -6,7 +6,10 @@ def _process(func, path, repeat):
     try:
         for i in range(repeat):
             data.append(func(np.loadtxt(path.format(i))))
-        data = np.array(data)[~np.isnan(data)]  # exclude nan
+        data = np.array(data)
+        data = data[~np.isnan(data)]  # exclude nan
+        if data.size == 0:
+            return np.nan, np.nan
         return np.mean(data), np.std(data)
     except ValueError as e:  # should use method below
         if len(data) != 0:
@@ -15,8 +18,12 @@ def _process(func, path, repeat):
 
     try:
         for i in range(repeat):
-            data.append(func(open(path.format(i)).readlines()))
-        data = np.array(data)[~np.isnan(data)]
+            with open(path.format(i), "r") as f:
+                data.append(func(f.readlines()))
+        data = np.array(data)
+        data = data[~np.isnan(data)]
+        if data.size == 0:
+            return np.nan, np.nan
         return np.mean(data), np.std(data)
     except Exception as e:
         print(e)
@@ -42,14 +49,18 @@ def extract_name(path):
     return ""
 
 def extract_success(lines):
-    # example: Epoch 20000: saving model to runs/08.10-05.59.14-LBFGS_MainExp/0-0/20000.pt ...
-    flags = [False, False]
+    # DeepXDE example:
+    #   Epoch 20000: saving model to .../20000.pt ...
+    #
+    # For other runners (e.g. vendored PINA), we accept any "Epoch ...: saving model"
+    # line as a success signal (paired with a "'train' took ..." timing line).
+    flags = [False, False]  # [epoch_saved, train_time_logged]
     for line in lines:
         line = line.strip()
-        if line.startswith("Epoch 20000:"):
-            flags[0]=True
+        if line.startswith("Epoch") and "saving model" in line:
+            flags[0] = True
         elif line.startswith("'train'"):
-            flags[1]=True
+            flags[1] = True
     return 1 if flags[0] and flags[1] else 0
 
 def summary(path, tasknum, repeat, iters):

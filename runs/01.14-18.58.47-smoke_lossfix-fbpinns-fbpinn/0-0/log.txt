@@ -1,0 +1,77 @@
+***** Begin #0-0 *****
+PDE Class Name: FBPINNS_Burgers1D
+Seed: 55698346
+RUN: pinnacle_2x1_Burgers1D_64h_4l_90b_0.6w
+P: <burger.Burgers1D object at 0x0000013D287EA660>
+SUBDOMAIN_XS: [array([-1.,  0.,  1.]), array([0., 1.])]
+SUBDOMAIN_WS: [array([0.6, 0.6, 0.6]), array([0.6, 0.6])]
+BOUNDARY_N: (1,)
+Y_N: (0, 1)
+ACTIVE_SCHEDULER: <class 'training.active_schedulers.AllActiveSchedulerND'>
+ACTIVE_SCHEDULER_ARGS: ()
+DEVICE: cpu
+MODEL: <class 'models.models.FCN'>
+N_HIDDEN: 64
+N_LAYERS: 4
+BATCH_SIZE: (90, 90)
+RANDOM: False
+LRATE: 0.001
+BOUNDARY_WEIGHT: 100
+BOUNDARY_BATCH_SIZE: 2025
+DATALOSS_WEIGHT: 1
+N_STEPS: 10
+SEED: 55698346
+BATCH_SIZE_TEST: (100, 100)
+BOUNDARY_BATCH_SIZE_TEST: 2500
+PLOT_LIMS: (1.1, False)
+SUMMARY_FREQ: 1
+TEST_FREQ: 1
+MODEL_SAVE_FREQ: 10000
+SHOW_FIGURES: False
+SAVE_FIGURES: True
+CLEAR_OUTPUT: False
+RESULTS_ROOT: C:\Users\alex\Documents\GitHub\PINN\runs\01.14-18.58.47-smoke_lossfix-fbpinns-fbpinn\0-0\fbpinns_results\
+BENCHMARK_RESULTS_ROOT: C:\Users\alex\Documents\GitHub\PINN\runs\01.14-18.58.47-smoke_lossfix-fbpinns-fbpinn\0-0\fbpinns_benchmark_results\
+SUMMARY_OUT_DIR: C:\Users\alex\Documents\GitHub\PINN\runs\01.14-18.58.47-smoke_lossfix-fbpinns-fbpinn\0-0\fbpinns_results\summaries\pinnacle_2x1_Burgers1D_64h_4l_90b_0.6w\
+MODEL_OUT_DIR: C:\Users\alex\Documents\GitHub\PINN\runs\01.14-18.58.47-smoke_lossfix-fbpinns-fbpinn\0-0\fbpinns_results\models\pinnacle_2x1_Burgers1D_64h_4l_90b_0.6w\
+HOSTNAME: win-4c7rjmr7oid
+Device: cpu
+Main thread ID: 22264
+Torch seed:  55698346
+0 Active updated:
+ [[1]
+ [1]]
+[i: 1/10] loss: 1.2610 rate: 6.4 elapsed: 0.00 hr 2026-01-14 15:58:52 pinnacle_2x1_Burgers1D_64h_4l_90b_0.6w
+
+torch.Size([10000, 2]) torch.Size([10000, 1]) torch.Size([10000, 1])
+[i: 2/10] loss: 1.2076 rate: 5.4 elapsed: 0.00 hr 2026-01-14 15:58:57 pinnacle_2x1_Burgers1D_64h_4l_90b_0.6w
+
+torch.Size([10000, 2]) torch.Size([10000, 1]) torch.Size([10000, 1])
+[i: 3/10] loss: 1.1588 rate: 8.9 elapsed: 0.00 hr 2026-01-14 15:59:02 pinnacle_2x1_Burgers1D_64h_4l_90b_0.6w
+
+torch.Size([10000, 2]) torch.Size([10000, 1]) torch.Size([10000, 1])
+[i: 4/10] loss: 1.1130 rate: 9.1 elapsed: 0.00 hr 2026-01-14 15:59:06 pinnacle_2x1_Burgers1D_64h_4l_90b_0.6w
+
+torch.Size([10000, 2]) torch.Size([10000, 1]) torch.Size([10000, 1])
+[i: 5/10] loss: 1.0692 rate: 10.0 elapsed: 0.01 hr 2026-01-14 15:59:11 pinnacle_2x1_Burgers1D_64h_4l_90b_0.6w
+
+torch.Size([10000, 2]) torch.Size([10000, 1]) torch.Size([10000, 1])
+[i: 6/10] loss: 1.0269 rate: 10.2 elapsed: 0.01 hr 2026-01-14 15:59:16 pinnacle_2x1_Burgers1D_64h_4l_90b_0.6w
+
+torch.Size([10000, 2]) torch.Size([10000, 1]) torch.Size([10000, 1])
+[i: 7/10] loss: 0.9861 rate: 9.3 elapsed: 0.01 hr 2026-01-14 15:59:21 pinnacle_2x1_Burgers1D_64h_4l_90b_0.6w
+
+torch.Size([10000, 2]) torch.Size([10000, 1]) torch.Size([10000, 1])
+[i: 8/10] loss: 0.9471 rate: 9.2 elapsed: 0.01 hr 2026-01-14 15:59:25 pinnacle_2x1_Burgers1D_64h_4l_90b_0.6w
+
+torch.Size([10000, 2]) torch.Size([10000, 1]) torch.Size([10000, 1])
+[i: 9/10] loss: 0.9102 rate: 8.3 elapsed: 0.01 hr 2026-01-14 15:59:30 pinnacle_2x1_Burgers1D_64h_4l_90b_0.6w
+
+torch.Size([10000, 2]) torch.Size([10000, 1]) torch.Size([10000, 1])
+[i: 10/10] loss: 0.8758 rate: 7.7 elapsed: 0.01 hr 2026-01-14 15:59:34 pinnacle_2x1_Burgers1D_64h_4l_90b_0.6w
+
+torch.Size([10000, 2]) torch.Size([10000, 1]) torch.Size([10000, 1])
+Finished training
+Epoch 10: saving model to C:\Users\alex\Documents\GitHub\PINN\runs\01.14-18.58.47-smoke_lossfix-fbpinns-fbpinn\0-0/10.pt ...
+'train' took 49.074013 s
+*****  End #0-0  *****

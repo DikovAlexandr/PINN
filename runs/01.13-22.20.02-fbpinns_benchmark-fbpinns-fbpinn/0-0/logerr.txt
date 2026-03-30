@@ -1,0 +1,2 @@
+C:\Users\alex\AppData\Local\Programs\Python\Python313\Lib\site-packages\torch\functional.py:505: UserWarning: torch.meshgrid: in an upcoming release, it will be required to pass the indexing argument. (Triggered internally at C:\actions-runner\_work\pytorch\pytorch\pytorch\aten\src\ATen\native\TensorShape.cpp:4319.)
+  return _VF.meshgrid(tensors, **kwargs)  # type: ignore[attr-defined]

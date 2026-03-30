@@ -1,73 +1,108 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+"""FBPINNs multiprocessing helpers (vendored).
+
+This module provides a small wrapper around :mod:`multiprocessing` used by
+the original FBPINNs code. The API is intentionally minimal and keeps the
+same behaviour as upstream:
+
+- class :class:`Pool` with a ``starmap`` method,
+- the target function receives the worker index ``ip`` as the first argument.
 """
-Created on Wed Mar 10 15:10:09 2021
 
-@author: bmoseley
-"""
+from __future__ import annotations
 
-# This module contains a multiprocessing helper class
-
-import os
 import multiprocessing as mp
+import os
+from typing import Any, Callable, Iterable, List, Sequence
 
 
 class Pool:
     """Multiprocessing pool for running a function across multiple workers.
-    Analogous to multiprocessing.Pool except that it also passes the process id to the target function as the first argument.
+
+    This is analogous to :class:`multiprocessing.Pool`, but the target
+    function additionally receives the worker index ``ip`` as the first
+    argument.
     """
-    
-    def __init__(self, processes=1):
-        "Create pool, processes is number of processes"
-        
+
+    def __init__(self, processes: int = 1) -> None:
+        """Create the pool.
+
+        :param int processes: Number of worker processes.
+        """
         self.processes = processes
-        
-    def _worker_loop(self, func, ip, inputQueue):
-        "Worker loop"
-        
+
+    def _worker_loop(
+        self,
+        func: Callable[..., Any],
+        ip: int,
+        input_queue: "mp.Queue[List[Any]]",
+    ) -> None:
+        """Worker loop, consuming tasks from ``input_queue``."""
         while True:
-            args = inputQueue.get(block=True, timeout=None)# get task
-            if args == -1: break# poison apple
-            
-            # just in case there is a memory leak 
-            p = mp.Process(target=func, args=[ip]+args, daemon=False)
+            # get task
+            args = input_queue.get(block=True, timeout=None)
+            if args == -1:
+                # poison pill – stop this worker
+                break
+
+            # just in case there is a memory leak, run each task
+            # in a short-lived process
+            p = mp.Process(target=func, args=[ip] + args, daemon=False)
             p.start()
             p.join()
             if p.exitcode != 0:
-                print("ERROR: process %i terminated unexpectedly"%(os.getpid()))
+                print(
+                    f"ERROR: process {os.getpid()} "
+                    "terminated unexpectedly"
+                )
                 break
-    
-    def starmap(self, func, iterable):
-        """Analogous to multiprocessing.Pool.starmap, except that the process id is also passed as the first arugment to func,
-        i.e. computes func(ip, *iterable)
+
+    def starmap(
+        self,
+        func: Callable[..., Any],
+        iterable: Iterable[Sequence[Any]],
+    ) -> None:
+        """Apply ``func`` to every argument tuple in ``iterable``.
+
+        Behaviour is similar to :meth:`multiprocessing.Pool.starmap`,
+        except that the worker index ``ip`` is also passed as the first
+        argument, i.e. we compute ``func(ip, *args)``.
         """
-        
         # put all inputs on input queue
-        inputQueue = mp.Queue()
-        for args in iterable: inputQueue.put(list(args))
-        for _ in range(self.processes): inputQueue.put(-1)# poison apples
-        
+        input_queue: "mp.Queue[List[Any]]" = mp.Queue()
+        for args in iterable:
+            input_queue.put(list(args))
+        # poison pills
+        for _ in range(self.processes):
+            input_queue.put(-1)
+
         # start processes running
-        ps = [mp.Process(target=self._worker_loop, args=(func,ip,inputQueue), daemon=False) for ip in range(self.processes)]
-        for p in ps: p.start()
-        for p in ps: p.join()
-        
-    def __enter__(self):
+        processes: List[mp.Process] = [
+            mp.Process(
+                target=self._worker_loop,
+                args=(func, ip, input_queue),
+                daemon=False,
+            )
+            for ip in range(self.processes)
+        ]
+        for p in processes:
+            p.start()
+        for p in processes:
+            p.join()
+
+    def __enter__(self) -> "Pool":
         return self
-    
-    def __exit__(self, *args):
-        pass
-    
-    
-def _f(ip, x, y):
-    #print(ip, x*y)
-    int("asd")
-        
-if __name__ == "__main__":
-    
+
+    def __exit__(self, *args: Any) -> None:
+        # nothing special to clean up: workers are short-lived
+        # and joined in :meth:`starmap`.
+        return None
+
+
+if __name__ == "__main__":  # pragma: no cover - simple usage example
     import numpy as np
-    
+
+    def _example(ip: int, x: int, y: int) -> None:
+        print(f"[worker {ip}] {x} * {y} = {x * y}")
+
     with Pool(processes=4) as pool:
-        
-        pool.starmap(_f, zip(np.arange(10), np.arange(10)))
-        
+        pool.starmap(_example, zip(np.arange(4), np.arange(4)))

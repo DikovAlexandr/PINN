@@ -1,21 +1,6 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Mar 15 21:53:56 2021
-
-@author: bmoseley
-
-本模块定义了FBPINN的训练流程
-可以忽略 full_model_PINN 函数和 PINNTrainer 类，后续的代码没有用到
-"""
-
-# This module defines trainer classes for FBPINNs and PINNs. It is the main entry point for training FBPINNs and PINNs
-# To train a FBPINN / PINN, use a Constants object to setup the problem and define its hyperparameters, and pass that 
-# to one of the trainer classes defined here
-
-
 import time
 
+import os
 import numpy as np
 import torch
 import torch.optim
@@ -24,11 +9,15 @@ import itertools
 from scipy.interpolate import griddata
 import scipy
 
-import plot_main
-import losses
-from trainersBase import _Trainer
-from constants import Constants
-from domains import ActiveRectangularDomainND
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "plot"))
+
+import plot.plot_main as plot_main
+from training import losses
+from training.trainersBase import _Trainer
+from config.constants import Constants
+from domain.domains import ActiveRectangularDomainND
 
 
 ## HELPER FUNCTIONS
@@ -312,7 +301,28 @@ class FBPINNTrainer(_Trainer):
         # get losses over test data
         yj_test_loss = [losses.l2_rel_err(a[mesh_test], b[mesh_test]).item() for a,b in zip(yj_true, yj_full_fds)]
         physics_loss = c.P.physics_loss(x_test[mesh_test], *(yj[mesh_test] for yj in yj_full)).item()# problem-specific
-        yj_test_losses.append([i + 1, mstep, fstep]+yj_test_loss+[physics_loss]+([bd_loss]if self.need_bd else []))
+
+        # get L2RE/MSE over ref data or copy from test data (for history + logs)
+        if hasattr(c.P, "ref_data"):
+            ref_x_torch = torch.tensor(c.P.ref_x, device=x_test.device)
+            yj_full2, _, _ = full_model_FBPINN(ref_x_torch, models, c, D)
+            a1, a2 = torch.from_numpy(c.P.ref_y).to(self.device), yj_full2[0]
+        else:
+            a1, a2 = yj_true[0], yj_full_fds[0]
+        l2re, l1re = losses.l2_rel_err(a1, a2), losses.l1_rel_err(a1, a2)
+        mse, mae = losses.l2_loss(a1, a2), losses.l1_loss(a1, a2)
+        maxe, csve = losses.max_err(a1, a2), losses.err_csv(a1, a2)
+
+        # Persist loss history for plotting:
+        # [step, mstep, fstep, test_loss_yj0.., mse, physics_loss, (bd_loss?), train_loss]
+        yj_test_losses.append(
+            [i + 1, mstep, fstep]
+            + yj_test_loss
+            + [mse.item()]
+            + [physics_loss]
+            + ([bd_loss] if self.need_bd else [])
+            + [train_tot_loss]
+        )
         for j,l in enumerate(yj_test_loss): 
             for step,tag in zip([i + 1, mstep, fstep], ["istep", "mstep", "zfstep"]):
                 #istep: step number, mstep: number of weights updated, zfstep:  number of FLOPS
@@ -325,16 +335,6 @@ class FBPINNTrainer(_Trainer):
             writer.add_scalar("loss_mstep/phy_plus_w_mult_bd/test",physics_loss+c.BOUNDARY_WEIGHT*bd_loss, mstep)
             writer.add_scalar("loss_zfstep/phy_plus_w_mult_bd/test",physics_loss+c.BOUNDARY_WEIGHT*bd_loss, fstep)
         
-        # get L2RE/MSE over ref data or copy L2RE/MSE from test data
-        if hasattr(c.P, "ref_data"):
-            ref_x_torch = torch.tensor(c.P.ref_x, device=x_test.device)
-            yj_full2, _, _ = full_model_FBPINN(ref_x_torch, models, c, D)
-            a1, a2 = torch.from_numpy(c.P.ref_y).to(self.device), yj_full2[0]
-        else:
-            a1, a2 = yj_true[0], yj_full_fds[0]
-        l2re, l1re = losses.l2_rel_err(a1, a2), losses.l1_rel_err(a1, a2)
-        mse, mae = losses.l2_loss(a1, a2), losses.l1_loss(a1, a2)
-        maxe, csve = losses.max_err(a1, a2), losses.err_csv(a1, a2)
         for e,ee in zip([l2re, mse, maxe, csve],["l2re","mse", "maxe", "csve"]):
             writer.add_scalar("loss_istep/"+ee+"/test", e, i + 1)
             writer.add_scalar("loss_mstep/"+ee+"/test", e, mstep)
@@ -481,21 +481,62 @@ class FBPINNTrainer(_Trainer):
         usetime = time.time() - start
         train_loss = loss
         # l2l1s is a tuple: (l2re_, l1re_, mse_, mae_, maxe_, csve_)
+        # benchmark_results root can be overridden (see constants.py: BENCHMARK_RESULTS_ROOT)
+        bench_root = getattr(c, "BENCHMARK_RESULTS_ROOT", "benchmark_results/")
+
         if hasattr(c, "hyperparam_name"):
             if c.hyperparam_name == "width":
-                f_log = open("benchmark_results/hyperparam/width/"+c.P.name+"_"+str(c.hyperparam_value)+"_"+str(c.SEED), 'w')
+                out_dir = os.path.join(bench_root, "hyperparam", "width")
+                out_name = f"{c.P.name}_{c.hyperparam_value}_{c.SEED}"
             elif c.hyperparam_name == "div":
-                f_log = open("benchmark_results/hyperparam/div/"+c.P.name+"_"+str(c.hyperparam_value)+"_"+str(c.SEED), 'w')
+                out_dir = os.path.join(bench_root, "hyperparam", "div")
+                out_name = f"{c.P.name}_{c.hyperparam_value}_{c.SEED}"
+            else:
+                out_dir = os.path.join(bench_root, "hyperparam")
+                out_name = f"{c.P.name}_{c.SEED}"
         elif hasattr(c, "parameterized_value"):
-            f_log = open("benchmark_results/parampde/"+c.P.name+"_"+str(c.parameterized_value)+"_"+str(c.SEED), 'w')
+            out_dir = os.path.join(bench_root, "parampde")
+            out_name = f"{c.P.name}_{c.parameterized_value}_{c.SEED}"
         else:
-            f_log = open("benchmark_results/"+ ("fb" if D.N_MODELS > 1 else "ctrl") +"/"+c.P.name+"_"+str(c.SEED), 'w')
-        f_log.write(str(usetime)+" "+str(train_loss)+" "+" ".join([str(l) for l in l2l1s])+" "+"_".join([str(len(arr)-1) for arr in c.SUBDOMAIN_XS]))
-        f_log.close()
-        # draw figures
-        figpath = self.c.SUMMARY_OUT_DIR+"%s_%.8i.png"%("train-test", end_loop_i + 1)
+            out_dir = os.path.join(bench_root, ("fb" if D.N_MODELS > 1 else "ctrl"))
+            out_name = f"{c.P.name}_{c.SEED}"
+
+        os.makedirs(out_dir, exist_ok=True)
+        with open(os.path.join(out_dir, out_name), "w") as f_log:
+            f_log.write(
+                str(usetime)
+                + " "
+                + str(train_loss)
+                + " "
+                + " ".join([str(l) for l in l2l1s])
+                + " "
+                + "_".join([str(len(arr) - 1) for arr in c.SUBDOMAIN_XS])
+            )
+
+        # Export figures to benchmark figs/ (PDF preferred)
         from shutil import copyfile
-        copyfile(figpath, "benchmark_results/figs/"+ ("fb/" if D.N_MODELS > 1 else "ctrl/")+c.P.name+"_"+str(c.SEED)+".png")
+
+        figs_dir = os.path.join(bench_root, "figs", ("fb" if D.N_MODELS > 1 else "ctrl"))
+        os.makedirs(figs_dir, exist_ok=True)
+
+        step = end_loop_i + 1
+        # Copy all per-plot PDFs produced at the last step.
+        try:
+            for fn in os.listdir(self.c.SUMMARY_OUT_DIR):
+                if not fn.endswith(f"_{step:08d}.pdf"):
+                    continue
+                plot_name = fn[: -len(f"_{step:08d}.pdf")]
+                src = os.path.join(self.c.SUMMARY_OUT_DIR, fn)
+                dst = os.path.join(figs_dir, f"{c.P.name}_{c.SEED}_{plot_name}.pdf")
+                copyfile(src, dst)
+        except Exception as e:
+            print(f"Warning: failed to export pdf figures: {e}")
+
+        # Backwards compatible single-image export (if present)
+        legacy_png = self.c.SUMMARY_OUT_DIR + "%s_%.8i.png" % ("train-test", step)
+        if os.path.exists(legacy_png):
+            dst_fig = os.path.join(figs_dir, f"{c.P.name}_{c.SEED}.png")
+            copyfile(legacy_png, dst_fig)
     
     def frmse_init(self):
         c = self.c
@@ -559,7 +600,18 @@ class FBPINNTrainer(_Trainer):
         # get losses over test data
         yj_test_loss = [losses.l2_rel_err(a,b).item() for a,b in zip(yj_true, yj_full)]
         physics_loss = c.P.physics_loss(x_test, *yj_full).item()# problem-specific
-        yj_test_losses.append([i + 1, mstep, fstep]+yj_test_loss+[physics_loss])
+
+        # MSE for history + logs
+        if hasattr(c.P, "ref_data"):
+            ref_x_torch = torch.tensor(c.P.ref_x, device=x_test.device)
+            yj_full2, _ = full_model_PINN(ref_x_torch, model, c)
+            mse = losses.l2_loss(torch.from_numpy(c.P.ref_y).to(self.device), yj_full2[0])
+        else:
+            mse = losses.l2_loss(yj_true[0], yj_full[0])
+
+        # Persist loss history for plotting:
+        # [step, mstep, fstep, test_loss_yj0.., mse, physics_loss, train_loss]
+        yj_test_losses.append([i + 1, mstep, fstep] + yj_test_loss + [mse.item(), physics_loss, train_tot_loss])
         for j,l in enumerate(yj_test_loss): 
             for step,tag in zip([i + 1, mstep, fstep], ["istep", "mstep", "zfstep"]):
                 writer.add_scalar("loss_%s/yj%i/test"%(tag,j), l, step)
@@ -577,6 +629,10 @@ class FBPINNTrainer(_Trainer):
         writer.add_scalar("loss_istep/l2re/test", l2re, i + 1)
         writer.add_scalar("loss_mstep/l2re/test", l2re, mstep)
         writer.add_scalar("loss_zfstep/l2re/test", l2re, fstep)
+
+        writer.add_scalar("loss_istep/mse/test", mse, i + 1)
+        writer.add_scalar("loss_mstep/mse/test", mse, mstep)
+        writer.add_scalar("loss_zfstep/mse/test", mse, fstep)
 
         # PLOTS
         

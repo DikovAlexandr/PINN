@@ -1,0 +1,3 @@
+***** Begin #0-0 *****
+PDE Class Name: FBPINNS_Burgers1D
+Seed: 621543731

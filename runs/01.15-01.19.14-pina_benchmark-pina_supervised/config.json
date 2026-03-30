@@ -1,0 +1,23 @@
+{
+    "seed": null,
+    "repeat": 1,
+    "suite": "ref",
+    "cases": [
+        "Burgers1D",
+        "Poisson2D_Classic",
+        "HeatMultiscale",
+        "NS_Long",
+        "GrayScott",
+        "WaveHetergeneous"
+    ],
+    "method": "pina_supervised",
+    "model": "feedforward",
+    "hidden": "64,64,64",
+    "batch_size": null,
+    "epochs": 2000,
+    "n_train": 20000,
+    "eval_n": 5000,
+    "ensemble_n": 3,
+    "ref_dir": "ref",
+    "shuffle": false
+}

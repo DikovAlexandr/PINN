@@ -1,0 +1,2 @@
+,pde,iter,success_rate,run_time,run_time_std,train_loss,train_loss_std,mse,mse_std,mxe,mxe_std,l2rel,l2rel_std,crmse,crmse_std,frmse_low,frmse_low_std,frmse_mid,frmse_mid_std,frmse_high,frmse_high_std
+0,FBPINNS_Burgers1D,10,1.0,49.074013,0.0,0.8757508397102356,0.0,0.10590414702892303,0.0,0.9737878441810608,0.0,0.5346422791481018,0.0,,,61.76336091671455,0.0,2.280565281566918,0.0,0.005370977767816905,0.0

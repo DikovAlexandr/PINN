@@ -1,0 +1,2 @@
+C:\Users\alex\Documents\GitHub\PINN\pinnacle\fbpinns\plot_main_2D.py:102: RuntimeWarning: More than 20 figures have been opened. Figures created through the pyplot interface (`matplotlib.pyplot.figure`) are retained until explicitly closed and may consume too much memory. (To control this warning, see the rcParam `figure.max_open_warning`). Consider using `matplotlib.pyplot.close()`.
+  fig, ax = plt.subplots(1, 1, figsize=plot_main.ieee_figsize("single", 0.55), constrained_layout=True)

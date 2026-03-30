@@ -1,0 +1,3 @@
+,pde,iter,success_rate,run_time,run_time_std,train_loss,train_loss_std,mse,mse_std,mxe,mxe_std,l2rel,l2rel_std,crmse,crmse_std,frmse_low,frmse_low_std,frmse_mid,frmse_mid_std,frmse_high,frmse_high_std
+0,PINA_REF_Burgers1D,50,1.0,1.083524,0.0,0.21652336418628693,0.0,0.554326057434082,0.0,0.9618600606918335,0.0,4.351833820343018,0.0,,,,,,,,
+1,PINA_REF_Poisson2D_Classic,50,1.0,0.527776,0.0,0.10219444334506989,0.0,0.03143088519573212,0.0,0.4197638928890228,0.0,0.40813830494880676,0.0,,,,,,,,
