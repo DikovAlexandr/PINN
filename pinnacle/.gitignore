@@ -1,5 +1,6 @@
 *.png
 *.txt
+!requirements.txt
 docs/
 runs/
 example_*.py

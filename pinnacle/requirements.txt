@@ -1,5 +1,5 @@
-# Root environment for the current main branch.
-# This file mirrors pinnacle/requirements.txt.
+# Main pinnacle environment for the current thesis workflow.
+# This file mirrors the root requirements.txt.
 
 # Core numerical stack
 numpy==1.24.2
